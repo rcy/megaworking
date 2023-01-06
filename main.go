@@ -85,6 +85,12 @@ func main() {
 		}
 	})
 
+	conn.AddCallback("QUIT", func(e *irc.Event) {
+		if e.Nick != nick {
+			conn.SendRawf("NAMES %s", channel)
+		}
+	})
+
 	conn.Loop()
 }
 
