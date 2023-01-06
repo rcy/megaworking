@@ -1,8 +1,8 @@
 M-x work
 ========
 
-Quickly jump into focussed work. Set goals outcomes for the
-work. Eliminate distractions.  Inspired by Ultraworking.
+Quickly jump into focussed work. Set goal and outcomes for the
+work. Eliminate distractions.  Inspired by [Ultraworking Cycles]([url](https://www.ultraworking.com/cycles).
 
 ## Irc bot
 
@@ -19,19 +19,6 @@ so talking can only happen during the breaks.
 
 Taking a break from work and chatting is encouraged.
 
-Ideas
-=====
-
-## Emacs client
-
-When you are ready to work, just hit `M-x work RET` in Emacs.
-
-You will be prompted to fill out:
-- how long the session will be
-- what you want to accomplish
-
-Then, a timer will be set.
-
 ## UTC Workcycle schedule 
 
 interval | activity
@@ -44,5 +31,3 @@ interval | activity
 01:30-02:00 | work
 ...|...
 
-## Installing Headquarters
-https://github.com/NunoSempere/ultraworking-headquarters
