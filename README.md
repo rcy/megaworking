@@ -34,13 +34,15 @@ Then, a timer will be set.
 
 ## UTC Workcycle schedule 
 
+interval | activity
+---|---
 00:00-00:10 | break
 00:10-00:40 | work
 00:40-00:50 | break
 00:50-01:20 | work
 01:20-01:30 | break
 01:30-02:00 | work
-...
+...|...
 
 ## Installing Headquarters
 https://github.com/NunoSempere/ultraworking-headquarters
