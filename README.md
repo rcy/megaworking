@@ -1,10 +1,11 @@
-M-x work
-========
+Megaworking
+===========
 
 Quickly jump into focussed work. Set goal and outcomes for the
-work. Eliminate distractions.  Inspired by [Ultraworking Cycles]([url](https://www.ultraworking.com/cycles).
+work. Eliminate distractions.
+Inspired by [Work Cycles](https://www.ultraworking.com/cycles) from [Ultraworking](https://www.ultraworking.com).
 
-## Irc bot
+## IRC bot
 
 Bot lives in a channel, like ##megaworking, and runs the time keeping
 for work cycles.
@@ -18,6 +19,8 @@ The bot has op status and will voice and devoice users in the channel
 so talking can only happen during the breaks.
 
 Taking a break from work and chatting is encouraged.
+
+Join ##megaworking on libera: https://web.libera.chat/?channel=##megaworking
 
 ## UTC Workcycle schedule 
 
