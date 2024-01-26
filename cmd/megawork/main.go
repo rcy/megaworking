@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
@@ -106,21 +105,20 @@ func (m model) View() string {
 }
 
 func main() {
-
-	err := form.Run()
+	err := prepareForm.Run()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	if !discount {
-		fmt.Println("What? You didn’t take the discount?!")
-	}
+	// if !discount {
+	// 	fmt.Println("What? You didn’t take the discount?!")
+	// }
 
-	p := tea.NewProgram(initialModel())
-	if _, err := p.Run(); err != nil {
-		fmt.Printf("Alas, there's been an error: %v", err)
-		os.Exit(1)
-	}
+	// p := tea.NewProgram(initialModel())
+	// if _, err := p.Run(); err != nil {
+	// 	fmt.Printf("Alas, there's been an error: %v", err)
+	// 	os.Exit(1)
+	// }
 }
 
 var (
@@ -130,6 +128,38 @@ var (
 	name         string
 	instructions string
 	discount     bool
+)
+
+var (
+	accomplish   string
+	whyImportant string
+	knowComplete string
+	risks        string
+	measurable   string
+	anythingElse string
+)
+
+var prepareForm = huh.NewForm(
+	huh.NewGroup(
+		huh.NewInput().
+			Title("What am I trying to accomplish?").
+			Value(&accomplish),
+		huh.NewInput().
+			Title("Why is this important and valuable?").
+			Value(&whyImportant),
+		huh.NewInput().
+			Title("How will I know when this is complete?").
+			Value(&knowComplete),
+		huh.NewInput().
+			Title("Any risks / hazards? Potential distractions, procrastination, etc.").
+			Value(&risks),
+		huh.NewInput().
+			Title("Is this concrete / measurable or subjective / ambiguous?").
+			Value(&measurable),
+		huh.NewInput().
+			Title("Anything else noteworthy?").
+			Value(&anythingElse),
+	),
 )
 
 var form = huh.NewForm(
