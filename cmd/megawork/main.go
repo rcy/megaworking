@@ -119,7 +119,7 @@ func main() {
 
 	q := m.New(db)
 
-	err = prepareForm.Run()
+	err = prepForm.Run()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -128,8 +128,17 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(prep)
-	// TODO save prep to database
+
+	err = cycleForm.Run()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	cycle, err := q.CreateCycle(context.TODO(), cycleParams)
+	if err != nil {
+		panic(err)
+	}
+	_, _ = cycle, prep
 
 	// if !discount {
 	// 	fmt.Println("What? You didn’t take the discount?!")
@@ -153,7 +162,7 @@ var (
 
 var prepParams = m.CreatePreparationParams{}
 
-var prepareForm = huh.NewForm(
+var prepForm = huh.NewForm(
 	huh.NewGroup(
 		huh.NewInput().
 			Title("What am I trying to accomplish?").
@@ -173,6 +182,38 @@ var prepareForm = huh.NewForm(
 		huh.NewInput().
 			Title("Anything else noteworthy?").
 			Value(&prepParams.Noteworthy),
+	),
+)
+
+var cycleParams = m.CreateCycleParams{}
+
+var cycleForm = huh.NewForm(
+	huh.NewGroup(
+		huh.NewInput().
+			Title("What am I trying to accomplish this cycle?").
+			Value(&cycleParams.Accomplish),
+		huh.NewInput().
+			Title("How will I get started?").
+			Value(&cycleParams.Started),
+		huh.NewInput().
+			Title("Any hazards present?").
+			Value(&cycleParams.Hazards),
+		huh.NewSelect[int64]().
+			Title("Energy").
+			Options(
+				huh.NewOption("High", int64(1)),
+				huh.NewOption("Medium", int64(0)),
+				huh.NewOption("Low", int64(-1)),
+			).
+			Value(&cycleParams.Energy),
+		huh.NewSelect[int64]().
+			Title("Morale").
+			Options(
+				huh.NewOption("High", int64(1)),
+				huh.NewOption("Medium", int64(0)),
+				huh.NewOption("Low", int64(-1)),
+			).
+			Value(&cycleParams.Morale),
 	),
 )
 

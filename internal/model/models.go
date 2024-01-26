@@ -8,7 +8,19 @@ import (
 	"time"
 )
 
-type Preparation struct {
+type Cycle struct {
+	ID         int64
+	CreatedAt  time.Time
+	SessionID  int64
+	Accomplish string
+	Started    string
+	Hazards    string
+	Energy     int64
+	Morale     int64
+}
+
+type Session struct {
+	ID           int64
 	CreatedAt    time.Time
 	Accomplish   string
 	Important    string

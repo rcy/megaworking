@@ -9,8 +9,44 @@ import (
 	"context"
 )
 
+const createCycle = `-- name: CreateCycle :one
+insert into cycles(session_id, accomplish, started, hazards, energy, morale) values(?,?,?,?,?,?) returning id, created_at, session_id, accomplish, started, hazards, energy, morale
+`
+
+type CreateCycleParams struct {
+	SessionID  int64
+	Accomplish string
+	Started    string
+	Hazards    string
+	Energy     int64
+	Morale     int64
+}
+
+func (q *Queries) CreateCycle(ctx context.Context, arg CreateCycleParams) (Cycle, error) {
+	row := q.db.QueryRowContext(ctx, createCycle,
+		arg.SessionID,
+		arg.Accomplish,
+		arg.Started,
+		arg.Hazards,
+		arg.Energy,
+		arg.Morale,
+	)
+	var i Cycle
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.SessionID,
+		&i.Accomplish,
+		&i.Started,
+		&i.Hazards,
+		&i.Energy,
+		&i.Morale,
+	)
+	return i, err
+}
+
 const createPreparation = `-- name: CreatePreparation :one
-insert into preparations(accomplish, important, complete, distractions, measurable, noteworthy) values(?,?,?,?,?,?) returning created_at, accomplish, important, complete, distractions, measurable, noteworthy
+insert into sessions(accomplish, important, complete, distractions, measurable, noteworthy) values(?,?,?,?,?,?) returning id, created_at, accomplish, important, complete, distractions, measurable, noteworthy
 `
 
 type CreatePreparationParams struct {
@@ -22,7 +58,7 @@ type CreatePreparationParams struct {
 	Noteworthy   string
 }
 
-func (q *Queries) CreatePreparation(ctx context.Context, arg CreatePreparationParams) (Preparation, error) {
+func (q *Queries) CreatePreparation(ctx context.Context, arg CreatePreparationParams) (Session, error) {
 	row := q.db.QueryRowContext(ctx, createPreparation,
 		arg.Accomplish,
 		arg.Important,
@@ -31,8 +67,9 @@ func (q *Queries) CreatePreparation(ctx context.Context, arg CreatePreparationPa
 		arg.Measurable,
 		arg.Noteworthy,
 	)
-	var i Preparation
+	var i Session
 	err := row.Scan(
+		&i.ID,
 		&i.CreatedAt,
 		&i.Accomplish,
 		&i.Important,
