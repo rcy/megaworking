@@ -3,7 +3,10 @@ SHELL=/bin/bash -o pipefail
 include config.mk
 
 run:
-	go run cmd/megawork/main.go
+	SQLITE_DB=./app.db go run cmd/megawork/main.go
+
+sql:
+	sqlite3 app.db
 
 app.db:
 	cat internal/db/schema.sql | sqlite3 $@

@@ -1,12 +1,19 @@
 package main
 
 import (
+	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log"
+	"os"
+
+	m "github.com/rcy/megaworking/internal/model"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
+
+	_ "modernc.org/sqlite"
 )
 
 type model struct {
@@ -105,10 +112,24 @@ func (m model) View() string {
 }
 
 func main() {
-	err := prepareForm.Run()
+	db, err := sql.Open("sqlite", os.Getenv("SQLITE_DB"))
+	if err != nil {
+		panic(err)
+	}
+
+	q := m.New(db)
+
+	err = prepareForm.Run()
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	prep, err := q.CreatePreparation(context.TODO(), prepParams)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(prep)
+	// TODO save prep to database
 
 	// if !discount {
 	// 	fmt.Println("What? You didn’t take the discount?!")
@@ -130,35 +151,28 @@ var (
 	discount     bool
 )
 
-var (
-	accomplish   string
-	whyImportant string
-	knowComplete string
-	risks        string
-	measurable   string
-	anythingElse string
-)
+var prepParams = m.CreatePreparationParams{}
 
 var prepareForm = huh.NewForm(
 	huh.NewGroup(
 		huh.NewInput().
 			Title("What am I trying to accomplish?").
-			Value(&accomplish),
+			Value(&prepParams.Accomplish),
 		huh.NewInput().
 			Title("Why is this important and valuable?").
-			Value(&whyImportant),
+			Value(&prepParams.Important),
 		huh.NewInput().
 			Title("How will I know when this is complete?").
-			Value(&knowComplete),
+			Value(&prepParams.Complete),
 		huh.NewInput().
 			Title("Any risks / hazards? Potential distractions, procrastination, etc.").
-			Value(&risks),
+			Value(&prepParams.Distractions),
 		huh.NewInput().
 			Title("Is this concrete / measurable or subjective / ambiguous?").
-			Value(&measurable),
+			Value(&prepParams.Measurable),
 		huh.NewInput().
 			Title("Anything else noteworthy?").
-			Value(&anythingElse),
+			Value(&prepParams.Noteworthy),
 	),
 )
 

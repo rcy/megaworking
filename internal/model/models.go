@@ -4,9 +4,12 @@
 
 package model
 
-import ()
+import (
+	"time"
+)
 
 type Preparation struct {
+	CreatedAt    time.Time
 	Accomplish   string
 	Important    string
 	Complete     string

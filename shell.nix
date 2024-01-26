@@ -8,6 +8,5 @@ mkShell {
     unstable.go_1_21
     unstable.gopls
     unstable.golangci-lint
-    sqlite
   ];
 }

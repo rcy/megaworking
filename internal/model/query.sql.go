@@ -10,13 +10,30 @@ import (
 )
 
 const createPreparation = `-- name: CreatePreparation :one
-insert into preparations(accomplish) values(?) returning accomplish, important, complete, distractions, measurable, noteworthy
+insert into preparations(accomplish, important, complete, distractions, measurable, noteworthy) values(?,?,?,?,?,?) returning created_at, accomplish, important, complete, distractions, measurable, noteworthy
 `
 
-func (q *Queries) CreatePreparation(ctx context.Context, accomplish string) (Preparation, error) {
-	row := q.db.QueryRowContext(ctx, createPreparation, accomplish)
+type CreatePreparationParams struct {
+	Accomplish   string
+	Important    string
+	Complete     string
+	Distractions string
+	Measurable   string
+	Noteworthy   string
+}
+
+func (q *Queries) CreatePreparation(ctx context.Context, arg CreatePreparationParams) (Preparation, error) {
+	row := q.db.QueryRowContext(ctx, createPreparation,
+		arg.Accomplish,
+		arg.Important,
+		arg.Complete,
+		arg.Distractions,
+		arg.Measurable,
+		arg.Noteworthy,
+	)
 	var i Preparation
 	err := row.Scan(
+		&i.CreatedAt,
 		&i.Accomplish,
 		&i.Important,
 		&i.Complete,
