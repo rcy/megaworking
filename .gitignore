@@ -1,2 +1,3 @@
 ./main
 config.mk
+*.db
