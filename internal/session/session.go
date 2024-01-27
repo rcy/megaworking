@@ -31,9 +31,9 @@ func New(q *db.Queries) model {
 	return model{
 		state:       prepare,
 		q:           q,
-		prepareForm: *prepareForm,
-		planForm:    *planForm,
-		reviewForm:  *reviewForm,
+		prepareForm: *makePrepareForm(),
+		planForm:    *makePlanForm(),
+		reviewForm:  *makeReviewForm(),
 	}
 }
 
@@ -55,6 +55,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 		if m.prepareForm.State == huh.StateCompleted {
 			m.state = plan
+			m.planForm = *makePlanForm()
+			m.planForm.Init()
 		}
 
 		return m, cmd
@@ -65,7 +67,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		if m.planForm.State == huh.StateCompleted {
-			m.state = review
+			m.state = prepare
+			m.prepareForm = *makePrepareForm()
+			m.prepareForm.Init()
 		}
 
 		return m, cmd
@@ -102,70 +106,68 @@ func (m model) View() string {
 
 var prepParams = db.CreatePreparationParams{}
 
-var prepareForm = huh.NewForm(
-	huh.NewGroup(
-		huh.NewInput().
-			Title("What am I trying to accomplish?").
-			Value(&prepParams.Accomplish),
-		huh.NewInput().
-			Title("Why is this important and valuable?").
-			Value(&prepParams.Important),
-		huh.NewInput().
-			Title("How will I know when this is complete?").
-			Value(&prepParams.Complete),
-		huh.NewInput().
-			Title("Any risks / hazards? Potential distractions, procrastination, etc.").
-			Value(&prepParams.Distractions),
-		huh.NewInput().
-			Title("Is this concrete / measurable or subjective / ambiguous?").
-			Value(&prepParams.Measurable),
-		huh.NewInput().
-			Title("Anything else noteworthy?").
-			Value(&prepParams.Noteworthy),
-	),
-)
+func makePrepareForm() *huh.Form {
+	return huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().
+				Title("What am I trying to accomplish?").
+				Value(&prepParams.Accomplish),
+			huh.NewInput().
+				Title("Why is this important and valuable?").
+				Value(&prepParams.Important),
+			huh.NewInput().
+				Title("How will I know when this is complete?").
+				Value(&prepParams.Complete),
+			huh.NewInput().
+				Title("Any risks / hazards? Potential distractions, procrastination, etc.").
+				Value(&prepParams.Distractions),
+			huh.NewInput().
+				Title("Is this concrete / measurable or subjective / ambiguous?").
+				Value(&prepParams.Measurable),
+			huh.NewInput().
+				Title("Anything else noteworthy?").
+				Value(&prepParams.Noteworthy),
+		),
+	)
+}
 
-var cycleParams = db.CreateCycleParams{}
+func makePlanForm() *huh.Form {
+	return huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().
+				Title("What am I trying to accomplish this cycle?"),
+			huh.NewInput().
+				Title("How will I get started?"),
+			huh.NewInput().
+				Title("Any hazards present?"),
+			huh.NewSelect[int64]().
+				Title("Energy").
+				Options(
+					huh.NewOption("High", int64(1)),
+					huh.NewOption("Medium", int64(0)),
+					huh.NewOption("Low", int64(-1)),
+				),
+			huh.NewSelect[int64]().
+				Title("Morale").
+				Options(
+					huh.NewOption("High", int64(1)),
+					huh.NewOption("Medium", int64(0)),
+					huh.NewOption("Low", int64(-1)),
+				),
+		),
+	)
+}
 
-var planForm = huh.NewForm(
-	huh.NewGroup(
-		huh.NewInput().
-			Title("What am I trying to accomplish this cycle?").
-			Value(&cycleParams.Accomplish),
-		huh.NewInput().
-			Title("How will I get started?").
-			Value(&cycleParams.Started),
-		huh.NewInput().
-			Title("Any hazards present?").
-			Value(&cycleParams.Hazards),
-		huh.NewSelect[int64]().
-			Title("Energy").
-			Options(
-				huh.NewOption("High", int64(1)),
-				huh.NewOption("Medium", int64(0)),
-				huh.NewOption("Low", int64(-1)),
-			).
-			Value(&cycleParams.Energy),
-		huh.NewSelect[int64]().
-			Title("Morale").
-			Options(
-				huh.NewOption("High", int64(1)),
-				huh.NewOption("Medium", int64(0)),
-				huh.NewOption("Low", int64(-1)),
-			).
-			Value(&cycleParams.Morale),
-	),
-)
-
-var reviewForm = huh.NewForm(
-	huh.NewGroup(
-		huh.NewInput().
-			Title("Completed cycle's target?"),
-		huh.NewInput().
-			Title("Anything noteworthy?"),
-		huh.NewInput().
-			Title("Any distractions?"),
-		huh.NewInput().
-			Title("Things to improve for next cycle?"),
-	),
-)
+func makeReviewForm() *huh.Form {
+	return huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().
+				Title("Completed cycle's target?"),
+			huh.NewInput().
+				Title("Anything noteworthy?"),
+			huh.NewInput().
+				Title("Any distractions?"),
+			huh.NewInput().
+				Title("Things to improve for next cycle?"),
+		))
+}
