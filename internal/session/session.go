@@ -20,113 +20,109 @@ const (
 )
 
 type model struct {
-	state       state
-	q           *db.Queries
-	prepareForm huh.Form
-	planForm    huh.Form
-	reviewForm  huh.Form
+	state         state
+	q             *db.Queries
+	sessionParams *db.CreatePreparationParams
+	form          *huh.Form
 }
 
 func New(q *db.Queries) model {
+	sessionParams := &db.CreatePreparationParams{}
+
 	return model{
-		state:       prepare,
-		q:           q,
-		prepareForm: *makePrepareForm(),
-		planForm:    *makePlanForm(),
-		reviewForm:  *makeReviewForm(),
+		state:         prepare,
+		q:             q,
+		sessionParams: sessionParams,
+		form:          makePrepareForm(sessionParams),
 	}
 }
 
 func (m model) Init() tea.Cmd {
-	return tea.Batch(
-		m.prepareForm.Init(),
-		m.planForm.Init(),
-		m.reviewForm.Init(),
-	)
+	return m.form.Init()
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmds []tea.Cmd
+
+	if m.form != nil {
+		newModel, cmd := m.form.Update(msg)
+		if f, ok := newModel.(*huh.Form); ok {
+			m.form = f
+		}
+		cmds = append(cmds, cmd)
+	}
+
 	switch m.state {
 	case prepare:
-		newModel, cmd := m.prepareForm.Update(msg)
-		if f, ok := newModel.(*huh.Form); ok {
-			m.prepareForm = *f
-		}
-
-		if m.prepareForm.State == huh.StateCompleted {
+		if m.form != nil && m.form.State == huh.StateCompleted {
 			m.state = plan
-			m.planForm = *makePlanForm()
-			m.planForm.Init()
+			m.form = makePlanForm()
+			cmds = append(cmds, m.form.Init())
 		}
-
-		return m, cmd
 	case plan:
-		newModel, cmd := m.planForm.Update(msg)
-		if f, ok := newModel.(*huh.Form); ok {
-			m.planForm = *f
-		}
-
-		if m.planForm.State == huh.StateCompleted {
-			m.state = prepare
-			m.prepareForm = *makePrepareForm()
-			m.prepareForm.Init()
-		}
-
-		return m, cmd
-	case review:
-		newModel, cmd := m.reviewForm.Update(msg)
-		if f, ok := newModel.(*huh.Form); ok {
-			m.reviewForm = *f
-		}
-
-		if m.reviewForm.State == huh.StateCompleted {
+		if m.form != nil && m.form.State == huh.StateCompleted {
 			m.state = work
+			m.form = makeReviewForm()
+			cmds = append(cmds, m.form.Init())
 		}
-
-		return m, cmd
 	case work:
-		return m, nil
+	case review:
+		if m.form != nil && m.form.State == huh.StateCompleted {
+			m.state = work
+			m.form = nil
+		}
+	case rest:
+	case debrief:
 	default:
 		panic("unhandled state")
 	}
+
+	return m, tea.Batch(cmds...)
 }
 
 func (m model) View() string {
 	switch m.state {
 	case prepare:
-		return m.prepareForm.View()
+		if m.form != nil {
+			return m.form.View()
+		}
+		return "..."
 	case plan:
-		return m.planForm.View()
+		return m.form.View()
+	case work:
+		return "WORK"
 	case review:
-		return m.reviewForm.View()
+		return m.form.View()
+	case rest:
+		return "REST"
+	case debrief:
+		return "DEBRIEF"
 	default:
 		return fmt.Sprintf("state=%d", m.state)
 	}
 }
 
-var prepParams = db.CreatePreparationParams{}
-
-func makePrepareForm() *huh.Form {
+func makePrepareForm(values *db.CreatePreparationParams) *huh.Form {
 	return huh.NewForm(
 		huh.NewGroup(
 			huh.NewInput().
 				Title("What am I trying to accomplish?").
-				Value(&prepParams.Accomplish),
+				Value(&values.Accomplish),
 			huh.NewInput().
 				Title("Why is this important and valuable?").
-				Value(&prepParams.Important),
+				Value(&values.Important),
 			huh.NewInput().
 				Title("How will I know when this is complete?").
-				Value(&prepParams.Complete),
+				Value(&values.Complete),
 			huh.NewInput().
 				Title("Any risks / hazards? Potential distractions, procrastination, etc.").
-				Value(&prepParams.Distractions),
+				Value(&values.Distractions),
 			huh.NewInput().
 				Title("Is this concrete / measurable or subjective / ambiguous?").
-				Value(&prepParams.Measurable),
+				Value(&values.Measurable),
 			huh.NewInput().
 				Title("Anything else noteworthy?").
-				Value(&prepParams.Noteworthy),
+				Value(&values.Noteworthy),
 		),
 	)
 }
