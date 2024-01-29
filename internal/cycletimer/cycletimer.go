@@ -48,6 +48,31 @@ func (cs CycleTimer) CurrentCycle() Cycle {
 	return cs.CycleAt(time.Now())
 }
 
+type Ticker struct {
+	C       chan Cycle
+	running bool
+}
+
+func (ti *Ticker) Stop() {
+	ti.running = false
+}
+
+func (cs CycleTimer) NewTicker(interval time.Duration) *Ticker {
+	t := &Ticker{
+		C:       make(chan Cycle),
+		running: true,
+	}
+
+	go func() {
+		for t.running {
+			t.C <- cs.CurrentCycle()
+			time.Sleep(interval)
+		}
+	}()
+
+	return t
+}
+
 func (cs CycleTimer) CycleAt(when time.Time) Cycle {
 	var cycle Cycle
 

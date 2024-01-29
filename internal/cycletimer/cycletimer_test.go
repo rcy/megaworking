@@ -23,8 +23,8 @@ func TestCycleTimer(t *testing.T) {
 			want: Cycle{ID: 0, State: Work, Remaining: 30 * time.Minute},
 		},
 		{
-			when: start.Add(13 * time.Minute + 33 * time.Second),
-			want: Cycle{ID: 0, State: Work, Remaining: 26 * time.Minute + 27 * time.Second},
+			when: start.Add(13*time.Minute + 33*time.Second),
+			want: Cycle{ID: 0, State: Work, Remaining: 26*time.Minute + 27*time.Second},
 		},
 		{
 			when: start.Add(20 * time.Minute),
@@ -48,4 +48,28 @@ func TestCycleTimer(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestTicker(t *testing.T) {
+	timer := New()
+	ticker := timer.NewTicker(time.Millisecond * 100)
+
+	counter := 0
+
+	go func() {
+		for cycle := range ticker.C {
+			counter += 1
+			fmt.Println(cycle)
+		}
+	}()
+
+	fmt.Println("start sleep")
+	time.Sleep(550 * time.Millisecond)
+
+	ticker.Stop()
+	if counter != 6 {
+		t.Errorf("wanted 6 got %d", counter)
+	}
+
+	fmt.Println("stopped ticker")
 }
