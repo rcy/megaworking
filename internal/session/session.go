@@ -2,7 +2,9 @@ package session
 
 import (
 	"fmt"
+	"time"
 
+	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
@@ -28,6 +30,9 @@ type model struct {
 	form          *huh.Form
 	spinner       spinner.Model
 	timer         *cycletimer.CycleTimer
+	cycle         cycletimer.Cycle
+	progress      progress.Model
+	percent       float64
 }
 
 func New(q *db.Queries) model {
@@ -42,6 +47,11 @@ func New(q *db.Queries) model {
 		sessionParams: sessionParams,
 		form:          makePrepareForm(sessionParams),
 		spinner:       s,
+		progress: progress.New(
+			progress.WithoutPercentage(),
+			progress.WithSolidFill("#ff00dd"),
+			progress.WithWidth(80),
+		),
 	}
 }
 
@@ -69,37 +79,54 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		spinner, cmd := m.spinner.Update(s)
 		m.spinner = spinner
 		cmds = append(cmds, cmd)
+		// TODO return here rather than do more work below
+	}
+
+	if _, ok := msg.(tea.WindowSizeMsg); ok {
+		m.progress.Width = 80
+		return m, nil
+	}
+
+	if m.timer != nil {
+		m.cycle = m.timer.CurrentCycle()
 	}
 
 	switch m.state {
 	case prepare:
 		if m.form != nil && m.form.State == huh.StateCompleted {
 			m.state = plan
+			m.timer = cycletimer.NewCustom(10*time.Second, 5*time.Second, time.Now())
+			//m.timer = cycletimer.New()
 			m.form = makePlanForm()
-			m.timer = cycletimer.New()
 			cmds = append(cmds, m.form.Init())
 		}
 	case plan:
 		if m.form != nil && m.form.State == huh.StateCompleted {
 			m.form = nil
-			if m.timer.CurrentCycle().State == cycletimer.Work {
+			if m.cycle.Phase == cycletimer.Work {
 				m.state = work
 			} else {
 				m.state = rest
 			}
 		}
 	case work:
-		if m.timer.CurrentCycle().State == cycletimer.Rest {
-			m.state = debrief
+		m.progress.FullColor = "#ff0000"
+		if m.cycle.Phase == cycletimer.Rest {
+			m.state = review
+			m.form = makeReviewForm()
+			cmds = append(cmds, m.form.Init())
 		}
 	case rest:
-		if m.timer.CurrentCycle().State == cycletimer.Work {
+		m.progress.FullColor = "#00ff00"
+		if m.cycle.Phase == cycletimer.Work {
 			m.state = work
 		}
 	case review:
 		if m.form != nil && m.form.State == huh.StateCompleted {
-			m.state = work
-			m.form = nil
+			// TODO: check if completed the predetermined amount of cycles and route to either plan next cycle, or debrief session
+			m.state = plan
+			m.form = makePlanForm()
+			cmds = append(cmds, m.form.Init())
 		}
 	case debrief:
 	default:
@@ -119,9 +146,9 @@ func (m model) View() string {
 	case plan:
 		return m.form.View()
 	case work:
-		return "WORK: " + fmt.Sprint(m.timer.CurrentCycle())
+		return "Work" + m.progress.ViewAs(m.cycle.PhasePercentComplete())
 	case rest:
-		return "REST: " + fmt.Sprint(m.timer.CurrentCycle())
+		return "Rest" + m.progress.ViewAs(m.cycle.PhasePercentComplete())
 	case review:
 		return m.form.View()
 	case debrief:

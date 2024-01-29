@@ -11,29 +11,31 @@ type CycleTimer struct {
 	origin        time.Time
 }
 
-type state uint8
+type phase uint8
 
 const (
-	Rest state = iota
+	Rest phase = iota
 	Work
 )
 
 type Cycle struct {
-	ID        int64
-	State     state
-	Remaining time.Duration
+	ID             int64
+	Phase          phase
+	PhaseDuration  time.Duration
+	PhaseRemaining time.Duration
+}
+
+func (c Cycle) PhasePercentComplete() float64 {
+	return 1 - float64(c.PhaseRemaining)/float64(c.PhaseDuration)
 }
 
 var origin = time.Date(2022, time.June, 0, 1, 0, 0, 0, time.UTC)
 
 func New() *CycleTimer {
-	return NewCustom(30, 10, origin)
+	return NewCustom(30*time.Minute, 10*time.Minute, origin)
 }
 
-func NewCustom(workMinutes, restMinutes int, origin time.Time) *CycleTimer {
-	workDuration := time.Minute * time.Duration(workMinutes)
-	restDuration := time.Minute * time.Duration(restMinutes)
-
+func NewCustom(workDuration, restDuration time.Duration, origin time.Time) *CycleTimer {
 	return &CycleTimer{
 		origin:        origin,
 		workDuration:  workDuration,
@@ -74,18 +76,20 @@ func (cs CycleTimer) NewTicker(interval time.Duration) *Ticker {
 }
 
 func (cs CycleTimer) CycleAt(when time.Time) Cycle {
-	var cycle Cycle
+	cycle := Cycle{}
 
 	elapsed := when.Sub(cs.origin)
 	pos := elapsed % cs.cycleDuration
 	cycle.ID = int64(elapsed / cs.cycleDuration)
 
 	if pos < cs.restEndAt {
-		cycle.State = Rest
-		cycle.Remaining = cs.restEndAt - pos
+		cycle.Phase = Rest
+		cycle.PhaseRemaining = cs.restEndAt - pos
+		cycle.PhaseDuration = cs.restDuration
 	} else {
-		cycle.State = Work
-		cycle.Remaining = cs.workEndAt - pos
+		cycle.Phase = Work
+		cycle.PhaseRemaining = cs.workEndAt - pos
+		cycle.PhaseDuration = cs.workDuration
 	}
 
 	return cycle

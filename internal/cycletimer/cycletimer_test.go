@@ -16,27 +16,27 @@ func TestCycleTimer(t *testing.T) {
 	}{
 		{
 			when: start,
-			want: Cycle{ID: 0, State: Rest, Remaining: 10 * time.Minute},
+			want: Cycle{ID: 0, Phase: Rest, PhaseRemaining: 10 * time.Minute},
 		},
 		{
 			when: start.Add(10 * time.Minute),
-			want: Cycle{ID: 0, State: Work, Remaining: 30 * time.Minute},
+			want: Cycle{ID: 0, Phase: Work, PhaseRemaining: 30 * time.Minute},
 		},
 		{
 			when: start.Add(13*time.Minute + 33*time.Second),
-			want: Cycle{ID: 0, State: Work, Remaining: 26*time.Minute + 27*time.Second},
+			want: Cycle{ID: 0, Phase: Work, PhaseRemaining: 26*time.Minute + 27*time.Second},
 		},
 		{
 			when: start.Add(20 * time.Minute),
-			want: Cycle{ID: 0, State: Work, Remaining: 20 * time.Minute},
+			want: Cycle{ID: 0, Phase: Work, PhaseRemaining: 20 * time.Minute},
 		},
 		{
 			when: start.Add(40 * time.Minute),
-			want: Cycle{ID: 1, State: Rest, Remaining: 10 * time.Minute},
+			want: Cycle{ID: 1, Phase: Rest, PhaseRemaining: 10 * time.Minute},
 		},
 		{
 			when: start.Add(1033 * time.Minute),
-			want: Cycle{ID: 25, State: Work, Remaining: 7 * time.Minute},
+			want: Cycle{ID: 25, Phase: Work, PhaseRemaining: 7 * time.Minute},
 		},
 	} {
 		t.Run(fmt.Sprint(tc.when), func(t *testing.T) {
