@@ -1,4 +1,4 @@
-package cycles
+package cycletimer
 
 import (
 	"fmt"

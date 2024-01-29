@@ -3,8 +3,10 @@ package session
 import (
 	"fmt"
 
+	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
+	"github.com/rcy/megaworking/internal/cycletimer"
 	"github.com/rcy/megaworking/internal/db"
 )
 
@@ -24,25 +26,36 @@ type model struct {
 	q             *db.Queries
 	sessionParams *db.CreatePreparationParams
 	form          *huh.Form
+	spinner       spinner.Model
+	timer         *cycletimer.CycleTimer
 }
 
 func New(q *db.Queries) model {
 	sessionParams := &db.CreatePreparationParams{}
+
+	s := spinner.New()
+	s.Spinner = spinner.MiniDot
 
 	return model{
 		state:         prepare,
 		q:             q,
 		sessionParams: sessionParams,
 		form:          makePrepareForm(sessionParams),
+		spinner:       s,
 	}
 }
 
 func (m model) Init() tea.Cmd {
-	return m.form.Init()
+	return tea.Batch(
+		m.form.Init(),
+		m.spinner.Tick,
+	)
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
+
+	//fmt.Println(reflect.TypeOf(msg).String())
 
 	if m.form != nil {
 		newModel, cmd := m.form.Update(msg)
@@ -52,26 +65,42 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		cmds = append(cmds, cmd)
 	}
 
+	if s, ok := msg.(spinner.TickMsg); ok {
+		spinner, cmd := m.spinner.Update(s)
+		m.spinner = spinner
+		cmds = append(cmds, cmd)
+	}
+
 	switch m.state {
 	case prepare:
 		if m.form != nil && m.form.State == huh.StateCompleted {
 			m.state = plan
 			m.form = makePlanForm()
+			m.timer = cycletimer.New()
 			cmds = append(cmds, m.form.Init())
 		}
 	case plan:
 		if m.form != nil && m.form.State == huh.StateCompleted {
-			m.state = work
-			m.form = makeReviewForm()
-			cmds = append(cmds, m.form.Init())
+			m.form = nil
+			if m.timer.CurrentCycle().State == cycletimer.Work {
+				m.state = work
+			} else {
+				m.state = rest
+			}
 		}
 	case work:
+		if m.timer.CurrentCycle().State == cycletimer.Rest {
+			m.state = debrief
+		}
+	case rest:
+		if m.timer.CurrentCycle().State == cycletimer.Work {
+			m.state = work
+		}
 	case review:
 		if m.form != nil && m.form.State == huh.StateCompleted {
 			m.state = work
 			m.form = nil
 		}
-	case rest:
 	case debrief:
 	default:
 		panic("unhandled state")
@@ -90,11 +119,11 @@ func (m model) View() string {
 	case plan:
 		return m.form.View()
 	case work:
-		return "WORK"
+		return "WORK: " + fmt.Sprint(m.timer.CurrentCycle())
+	case rest:
+		return "REST: " + fmt.Sprint(m.timer.CurrentCycle())
 	case review:
 		return m.form.View()
-	case rest:
-		return "REST"
 	case debrief:
 		return "DEBRIEF"
 	default:

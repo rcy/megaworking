@@ -1,4 +1,4 @@
-package cycles
+package cycletimer
 
 import "time"
 
@@ -26,15 +26,15 @@ type Cycle struct {
 
 var origin = time.Date(2022, time.June, 0, 1, 0, 0, 0, time.UTC)
 
-func New() CycleTimer {
+func New() *CycleTimer {
 	return NewCustom(30, 10, origin)
 }
 
-func NewCustom(workMinutes, restMinutes int, origin time.Time) CycleTimer {
+func NewCustom(workMinutes, restMinutes int, origin time.Time) *CycleTimer {
 	workDuration := time.Minute * time.Duration(workMinutes)
 	restDuration := time.Minute * time.Duration(restMinutes)
 
-	return CycleTimer{
+	return &CycleTimer{
 		origin:        origin,
 		workDuration:  workDuration,
 		restDuration:  restDuration,
