@@ -19,7 +19,8 @@ func main() {
 
 	q := db.New(sqldb)
 
-	if _, err := tea.NewProgram(app.New(q)).Run(); err != nil {
+	p := tea.NewProgram(app.New(q), tea.WithAltScreen())
+	if _, err := p.Run(); err != nil {
 		fmt.Printf("Uh oh, there was an error: %v\n", err)
 		os.Exit(1)
 	}
