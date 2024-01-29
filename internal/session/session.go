@@ -211,10 +211,16 @@ func makePlanForm() *huh.Form {
 }
 
 func makeReviewForm() *huh.Form {
+	var completed int64 = 100
 	return huh.NewForm(
 		huh.NewGroup(
-			huh.NewInput().
-				Title("Completed cycle's target?"),
+			huh.NewSelect[int64]().
+				Title("Completed cycle's target?").
+				Options(
+					huh.NewOption("Yes", int64(100)),
+					huh.NewOption("Half", int64(50)),
+					huh.NewOption("No", int64(0)),
+				).Value(&completed),
 			huh.NewInput().
 				Title("Anything noteworthy?"),
 			huh.NewInput().
