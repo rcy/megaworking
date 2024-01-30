@@ -50,7 +50,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case NewSessionMsg:
 		m.state = inSession
-		m.session = session.New(m.q)
+		m.session = session.New(m.q, &db.Session{})
 		cmd := m.session.Init()
 		return m, cmd
 	}
@@ -70,7 +70,7 @@ func (m model) View() string {
 	case welcome:
 		return "Welcome!"
 	case inSession:
-		return "*** SESSION ***\n\n" + m.session.View()
+		return m.session.View()
 	default:
 		return "???"
 	}
