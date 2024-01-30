@@ -45,11 +45,11 @@ func (q *Queries) CreateCycle(ctx context.Context, arg CreateCycleParams) (Cycle
 	return i, err
 }
 
-const createPreparation = `-- name: CreatePreparation :one
+const createSession = `-- name: CreateSession :one
 insert into sessions(accomplish, important, complete, distractions, measurable, noteworthy) values(?,?,?,?,?,?) returning id, created_at, accomplish, important, complete, distractions, measurable, noteworthy
 `
 
-type CreatePreparationParams struct {
+type CreateSessionParams struct {
 	Accomplish   string
 	Important    string
 	Complete     string
@@ -58,8 +58,8 @@ type CreatePreparationParams struct {
 	Noteworthy   string
 }
 
-func (q *Queries) CreatePreparation(ctx context.Context, arg CreatePreparationParams) (Session, error) {
-	row := q.db.QueryRowContext(ctx, createPreparation,
+func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error) {
+	row := q.db.QueryRowContext(ctx, createSession,
 		arg.Accomplish,
 		arg.Important,
 		arg.Complete,

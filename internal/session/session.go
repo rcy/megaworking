@@ -1,6 +1,7 @@
 package session
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -26,6 +27,7 @@ const (
 
 type model struct {
 	state       state
+	error       error
 	q           *db.Queries
 	sessionData *db.Session
 	cycleData   *db.Cycle
@@ -96,6 +98,19 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.form != nil && m.form.State == huh.StateCompleted {
 			m.state = plan
 			//m.timer = cycletimer.NewCustom(10*time.Second, 5*time.Second, time.Now())
+			session, err := m.q.CreateSession(context.Background(), db.CreateSessionParams{
+				Accomplish:   m.sessionData.Accomplish,
+				Important:    m.sessionData.Important,
+				Complete:     m.sessionData.Complete,
+				Distractions: m.sessionData.Distractions,
+				Measurable:   m.sessionData.Measurable,
+				Noteworthy:   m.sessionData.Noteworthy,
+			})
+			if err != nil {
+				m.error = err
+				break
+			}
+			m.sessionData = &session
 			m.timer = cycletimer.New()
 			m.cycleData = &db.Cycle{}
 			m.form = makePlanForm(m.cycleData)

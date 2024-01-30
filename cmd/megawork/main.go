@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"log"
 	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -18,6 +19,9 @@ func main() {
 	}
 
 	q := db.New(sqldb)
+
+	f, _ := os.OpenFile("log.txt", os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o644)
+	log.SetOutput(f)
 
 	p := tea.NewProgram(app.New(q), tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
