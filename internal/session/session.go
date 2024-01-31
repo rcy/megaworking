@@ -3,9 +3,8 @@ package session
 import (
 	"context"
 	"fmt"
-	"time"
+	"strings"
 
-	"github.com/charmbracelet/bubbles/progress"
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/huh"
@@ -35,8 +34,6 @@ type model struct {
 	spinner     spinner.Model
 	timer       *cycletimer.CycleTimer
 	cycle       cycletimer.Cycle
-	progress    progress.Model
-	percent     float64
 }
 
 func New(q *db.Queries, sessionData *db.Session) model {
@@ -47,13 +44,8 @@ func New(q *db.Queries, sessionData *db.Session) model {
 		state:       prepare,
 		q:           q,
 		sessionData: sessionData,
-		form:        makePrepareForm(sessionData),
-		spinner:     s,
-		progress: progress.New(
-			progress.WithoutPercentage(),
-			progress.WithSolidFill("#ff00dd"),
-			progress.WithWidth(80),
-		),
+		//form:        makePrepareForm(sessionData),
+		spinner: s,
 	}
 }
 
@@ -69,14 +61,6 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	//fmt.Println(reflect.TypeOf(msg).String())
 
-	if m.form != nil {
-		newModel, cmd := m.form.Update(msg)
-		if f, ok := newModel.(*huh.Form); ok {
-			m.form = f
-		}
-		cmds = append(cmds, cmd)
-	}
-
 	if s, ok := msg.(spinner.TickMsg); ok {
 		spinner, cmd := m.spinner.Update(s)
 		m.spinner = spinner
@@ -84,9 +68,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// TODO return here rather than do more work below
 	}
 
-	if _, ok := msg.(tea.WindowSizeMsg); ok {
-		m.progress.Width = 80
-		return m, nil
+	if m.form != nil {
+		newModel, cmd := m.form.Update(msg)
+		if f, ok := newModel.(*huh.Form); ok {
+			m.form = f
+		}
+		cmds = append(cmds, cmd)
 	}
 
 	if m.timer != nil {
@@ -98,7 +85,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.form != nil && m.form.State == huh.StateCompleted {
 			m.state = plan
 			//m.timer = cycletimer.NewCustom(10*time.Second, 5*time.Second, time.Now())
-			session, err := m.q.CreateSession(context.Background(), db.CreateSessionParams{
+			session, err := m.q.PrepareSession(context.Background(), db.PrepareSessionParams{
 				Accomplish:   m.sessionData.Accomplish,
 				Important:    m.sessionData.Important,
 				Complete:     m.sessionData.Complete,
@@ -126,14 +113,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 	case work:
-		m.progress.FullColor = "#ff0000"
 		if m.cycle.Phase == cycletimer.Rest {
 			m.state = review
 			m.form = makeReviewForm(m.cycleData)
 			cmds = append(cmds, m.form.Init())
 		}
 	case rest:
-		m.progress.FullColor = "#00ff00"
 		if m.cycle.Phase == cycletimer.Work {
 			m.state = work
 		}
@@ -154,7 +139,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 var (
-	sessionStyle = lipgloss.NewStyle().Border(lipgloss.RoundedBorder())
+	sessionStyle = lipgloss.NewStyle()
 )
 
 func (m model) View() string {
@@ -171,20 +156,15 @@ func (m model) View() string {
 		str += m.form.View()
 		return str
 	case work:
-		str := fmt.Sprintf("Work %s %s\n",
-			m.progress.ViewAs(m.cycle.PhasePercentComplete()),
-			m.cycle.PhaseRemaining.Round(time.Second))
-		str += "\n"
+		str := ""
 		str += m.sessionPrepView()
-		str += "\n"
+		str += "\n\n"
 		str += m.cyclePlanView()
+		str += "\n"
+		str += "\n"
 		return str
 	case rest:
 		str := m.sessionPrepView()
-		str += "\n"
-		str += fmt.Sprintf("Break %s %s\n",
-			m.progress.ViewAs(m.cycle.PhasePercentComplete()),
-			m.cycle.PhaseRemaining.Round(time.Second))
 		str += "\n"
 		str += m.cyclePlanView()
 		return str
@@ -208,13 +188,29 @@ func (m model) sessionPrepView0() string {
 }
 
 func (m model) sessionPrepView() string {
-	str := lipgloss.NewStyle().Bold(true).Render(m.sessionData.Accomplish) + " | "
-	str += "Why: " + m.sessionData.Important + " | "
-	str += "Completed: " + m.sessionData.Complete + " | "
-	str += "Distractions: " + m.sessionData.Distractions + " | "
-	str += "Measurable: " + m.sessionData.Measurable + " | "
-	str += "Notes: " + m.sessionData.Noteworthy
-	return sessionStyle.Foreground(lipgloss.Color("#ffbbbb")).Render(str)
+	d := m.sessionData
+	strs := []string{
+		lipgloss.NewStyle().Bold(true).Render("Session objective: " + d.Accomplish),
+	}
+	if d.Important != "" {
+		strs = append(strs, "Why: "+d.Important)
+	}
+	if d.Complete != "" {
+		strs = append(strs, "Completed: "+d.Complete)
+	}
+	if d.Distractions != "" {
+		strs = append(strs, "Distractions: "+d.Distractions)
+	}
+	if d.Measurable != "" {
+		strs = append(strs, "Measurable: "+d.Measurable)
+	}
+	if d.Noteworthy != "" {
+		strs = append(strs, "Notes: "+d.Noteworthy)
+	}
+
+	str := strings.Join(strs, "\n")
+	return lipgloss.NewStyle().SetString(str).Render()
+	//return sessionStyle.Foreground(lipgloss.Color("#ffbbbb")).Render(str)
 }
 
 func (m model) cyclePlanView() string {
@@ -223,31 +219,6 @@ func (m model) cyclePlanView() string {
 	str += "Hazards: " + m.cycleData.Hazards + "\n"
 	//str += "Energy: " + fmt.Sprint(m.cycleData.Energy) + " Morale: " + fmt.Sprint(m.cycleData.Morale)
 	return sessionStyle.Foreground(lipgloss.Color("#ffffff")).Render(str)
-}
-
-func makePrepareForm(data *db.Session) *huh.Form {
-	return huh.NewForm(
-		huh.NewGroup(
-			huh.NewInput().
-				Title("What am I trying to accomplish?").
-				Value(&data.Accomplish),
-			huh.NewInput().
-				Title("Why is this important and valuable?").
-				Value(&data.Important),
-			huh.NewInput().
-				Title("How will I know when this is complete?").
-				Value(&data.Complete),
-			huh.NewInput().
-				Title("Any risks / hazards? Potential distractions, procrastination, etc.").
-				Value(&data.Distractions),
-			huh.NewInput().
-				Title("Is this concrete / measurable or subjective / ambiguous?").
-				Value(&data.Measurable),
-			huh.NewInput().
-				Title("Anything else noteworthy?").
-				Value(&data.Noteworthy),
-		),
-	)
 }
 
 func makePlanForm(data *db.Cycle) *huh.Form {

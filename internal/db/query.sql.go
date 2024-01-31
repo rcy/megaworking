@@ -7,6 +7,7 @@ package db
 
 import (
 	"context"
+	"time"
 )
 
 const createCycle = `-- name: CreateCycle :one
@@ -46,10 +47,69 @@ func (q *Queries) CreateCycle(ctx context.Context, arg CreateCycleParams) (Cycle
 }
 
 const createSession = `-- name: CreateSession :one
-insert into sessions(accomplish, important, complete, distractions, measurable, noteworthy) values(?,?,?,?,?,?) returning id, created_at, accomplish, important, complete, distractions, measurable, noteworthy
+insert into sessions(num_cycles, start_at) values(?, ?) returning id, created_at, state, num_cycles, start_at, accomplish, important, complete, distractions, measurable, noteworthy
 `
 
 type CreateSessionParams struct {
+	NumCycles int64
+	StartAt   time.Time
+}
+
+func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error) {
+	row := q.db.QueryRowContext(ctx, createSession, arg.NumCycles, arg.StartAt)
+	var i Session
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.State,
+		&i.NumCycles,
+		&i.StartAt,
+		&i.Accomplish,
+		&i.Important,
+		&i.Complete,
+		&i.Distractions,
+		&i.Measurable,
+		&i.Noteworthy,
+	)
+	return i, err
+}
+
+const currentSession = `-- name: CurrentSession :one
+select id, created_at, state, num_cycles, start_at, accomplish, important, complete, distractions, measurable, noteworthy from sessions order by created_at desc limit 1
+`
+
+func (q *Queries) CurrentSession(ctx context.Context) (Session, error) {
+	row := q.db.QueryRowContext(ctx, currentSession)
+	var i Session
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.State,
+		&i.NumCycles,
+		&i.StartAt,
+		&i.Accomplish,
+		&i.Important,
+		&i.Complete,
+		&i.Distractions,
+		&i.Measurable,
+		&i.Noteworthy,
+	)
+	return i, err
+}
+
+const prepareSession = `-- name: PrepareSession :one
+update sessions
+set accomplish = ?,
+    important = ?,
+    complete = ?,
+    distractions = ?,
+    measurable = ?,
+    noteworthy = ?,
+    state = 'prepared'
+returning id, created_at, state, num_cycles, start_at, accomplish, important, complete, distractions, measurable, noteworthy
+`
+
+type PrepareSessionParams struct {
 	Accomplish   string
 	Important    string
 	Complete     string
@@ -58,8 +118,8 @@ type CreateSessionParams struct {
 	Noteworthy   string
 }
 
-func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (Session, error) {
-	row := q.db.QueryRowContext(ctx, createSession,
+func (q *Queries) PrepareSession(ctx context.Context, arg PrepareSessionParams) (Session, error) {
+	row := q.db.QueryRowContext(ctx, prepareSession,
 		arg.Accomplish,
 		arg.Important,
 		arg.Complete,
@@ -71,6 +131,9 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (S
 	err := row.Scan(
 		&i.ID,
 		&i.CreatedAt,
+		&i.State,
+		&i.NumCycles,
+		&i.StartAt,
 		&i.Accomplish,
 		&i.Important,
 		&i.Complete,
@@ -79,4 +142,79 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (S
 		&i.Noteworthy,
 	)
 	return i, err
+}
+
+const sessionCycles = `-- name: SessionCycles :many
+select id, created_at, session_id, accomplish, started, hazards, energy, morale from cycles where session_id = ? order by created_at desc
+`
+
+func (q *Queries) SessionCycles(ctx context.Context, sessionID int64) ([]Cycle, error) {
+	rows, err := q.db.QueryContext(ctx, sessionCycles, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Cycle
+	for rows.Next() {
+		var i Cycle
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.SessionID,
+			&i.Accomplish,
+			&i.Started,
+			&i.Hazards,
+			&i.Energy,
+			&i.Morale,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const sessions = `-- name: Sessions :many
+select id, created_at, state, num_cycles, start_at, accomplish, important, complete, distractions, measurable, noteworthy from sessions order by created_at desc
+`
+
+func (q *Queries) Sessions(ctx context.Context) ([]Session, error) {
+	rows, err := q.db.QueryContext(ctx, sessions)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Session
+	for rows.Next() {
+		var i Session
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.State,
+			&i.NumCycles,
+			&i.StartAt,
+			&i.Accomplish,
+			&i.Important,
+			&i.Complete,
+			&i.Distractions,
+			&i.Measurable,
+			&i.Noteworthy,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }

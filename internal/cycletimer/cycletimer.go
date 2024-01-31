@@ -13,6 +13,13 @@ type CycleTimer struct {
 
 type phase uint8
 
+func (p phase) String() string {
+	if p == Rest {
+		return "Rest"
+	}
+	return "Work"
+}
+
 const (
 	Rest phase = iota
 	Work

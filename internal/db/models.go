@@ -22,6 +22,9 @@ type Cycle struct {
 type Session struct {
 	ID           int64
 	CreatedAt    time.Time
+	State        string
+	NumCycles    int64
+	StartAt      time.Time
 	Accomplish   string
 	Important    string
 	Complete     string

@@ -14,17 +14,17 @@ const (
 )
 
 type model struct {
-	state   appState
 	q       *db.Queries
 	session tea.Model
 }
 
-type NewSessionMsg struct{}
+type NewSessionMsg struct {
+	session tea.Model
+}
 
 func New(q *db.Queries) model {
 	return model{
-		state: welcome,
-		q:     q,
+		q: q,
 	}
 }
 
@@ -32,8 +32,12 @@ func (m model) Init() tea.Cmd {
 	return nil
 }
 
-func NewSession() tea.Msg {
-	return NewSessionMsg{}
+func NewSession(m model) func() tea.Msg {
+	return func() tea.Msg {
+		return NewSessionMsg{
+			session: session.New(m.q, &db.Session{}),
+		}
+	}
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -42,21 +46,18 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.Type == tea.KeyCtrlC {
 			return m, tea.Quit
 		}
-		if m.state == welcome {
-			if msg.Type == tea.KeyEnter {
-				return m, NewSession
-			}
-		}
+		// if m.session == nil {
+		// 	if msg.Type == tea.KeyEnter {
+		// 		return m, NewSession(m)
+		// 	}
+		// }
 
 	case NewSessionMsg:
-		m.state = inSession
-		m.session = session.New(m.q, &db.Session{})
-		cmd := m.session.Init()
-		return m, cmd
+		m.session = msg.session
+		return m, msg.session.Init()
 	}
 
-	switch m.state {
-	case inSession:
+	if m.session != nil {
 		newSession, newCmd := m.session.Update(msg)
 		m.session = newSession
 		return m, newCmd
@@ -66,12 +67,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m model) View() string {
-	switch m.state {
-	case welcome:
-		return "Welcome!"
-	case inSession:
+	if m.session != nil {
 		return m.session.View()
-	default:
-		return "???"
 	}
+	return "Welcome!"
 }

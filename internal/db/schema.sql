@@ -2,13 +2,18 @@ create table sessions(
        id integer not null primary key,
        created_at datetime not null default current_timestamp,
 
+       state text not null default 'init',
+
+       num_cycles integer not null,
+       start_at datetime not null,
+
        -- prepare
-       accomplish text not null,
-       important text not null,
-       complete text not null,
-       distractions text not null,
-       measurable text not null,
-       noteworthy text not null--,
+       accomplish text not null default '',
+       important text not null default '',
+       complete text not null default '',
+       distractions text not null default '',
+       measurable text not null default '',
+       noteworthy text not null default ''
 
        -- debrief
        -- target integer not null,
