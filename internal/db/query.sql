@@ -13,6 +13,7 @@ set accomplish = ?,
     measurable = ?,
     noteworthy = ?,
     state = 'prepared'
+where id = ?
 returning *;
 
 -- name: CreateSession :one

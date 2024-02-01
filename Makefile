@@ -3,7 +3,7 @@ SHELL=/bin/bash -o pipefail
 include config.mk
 
 run:
-	SQLITE_DB=./app.db go run cmd/megawork/main.go
+	SQLITE_DB=./app.db go run cmd/foo/main.go
 
 sql:
 	sqlite3 app.db
@@ -14,7 +14,7 @@ app.db:
 gen:
 	go run github.com/sqlc-dev/sqlc/cmd/sqlc@latest generate
 
-resetdb: dist-clean app.db gen
+reset: dist-clean app.db gen
 
 dist-clean:
 	rm -f app.db

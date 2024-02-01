@@ -106,6 +106,7 @@ set accomplish = ?,
     measurable = ?,
     noteworthy = ?,
     state = 'prepared'
+where id = ?
 returning id, created_at, state, num_cycles, start_at, accomplish, important, complete, distractions, measurable, noteworthy
 `
 
@@ -116,6 +117,7 @@ type PrepareSessionParams struct {
 	Distractions string
 	Measurable   string
 	Noteworthy   string
+	ID           int64
 }
 
 func (q *Queries) PrepareSession(ctx context.Context, arg PrepareSessionParams) (Session, error) {
@@ -126,6 +128,7 @@ func (q *Queries) PrepareSession(ctx context.Context, arg PrepareSessionParams) 
 		arg.Distractions,
 		arg.Measurable,
 		arg.Noteworthy,
+		arg.ID,
 	)
 	var i Session
 	err := row.Scan(
