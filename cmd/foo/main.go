@@ -124,6 +124,12 @@ func (m model) View() string {
 }
 
 func main() {
+	file, err := tea.LogToFile("debug.log", "")
+	if err != nil {
+		panic(err)
+	}
+	defer file.Close()
+
 	sqldb, err := sql.Open("sqlite", os.Getenv("SQLITE_DB"))
 	if err != nil {
 		panic(err)
