@@ -38,12 +38,12 @@ func (c Cycle) PhasePercentComplete() float64 {
 
 var origin = time.Date(2022, time.June, 0, 1, 0, 0, 0, time.UTC)
 
-func New() *CycleTimer {
+func New() CycleTimer {
 	return NewCustom(30*time.Minute, 10*time.Minute, origin)
 }
 
-func NewCustom(workDuration, restDuration time.Duration, origin time.Time) *CycleTimer {
-	return &CycleTimer{
+func NewCustom(workDuration, restDuration time.Duration, origin time.Time) CycleTimer {
+	return CycleTimer{
 		origin:        origin,
 		workDuration:  workDuration,
 		restDuration:  restDuration,
@@ -84,6 +84,10 @@ func (cs CycleTimer) NewTicker(interval time.Duration) *Ticker {
 
 func (cs CycleTimer) CycleAt(when time.Time) Cycle {
 	cycle := Cycle{}
+
+	if cs.cycleDuration == 0 {
+		return cycle
+	}
 
 	elapsed := when.Sub(cs.origin)
 	pos := elapsed % cs.cycleDuration

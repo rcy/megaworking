@@ -10,3 +10,5 @@ type SessionLoaded struct {
 }
 
 type SessionNotFound struct{}
+
+type Tick struct{}

@@ -7,12 +7,11 @@ import (
 	"os"
 	"time"
 
-	"github.com/charmbracelet/bubbles/progress"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/rcy/megaworking/cmd/foo/messages"
 	"github.com/rcy/megaworking/cmd/foo/planning"
 	"github.com/rcy/megaworking/cmd/foo/preparation"
-	"github.com/rcy/megaworking/internal/cycletimer"
+	"github.com/rcy/megaworking/cmd/foo/timer"
 	"github.com/rcy/megaworking/internal/db"
 	_ "modernc.org/sqlite"
 )
@@ -21,18 +20,15 @@ type model struct {
 	q           *db.Queries
 	model       tea.Model
 	session     *db.Session
-	progress    progress.Model
+	timer       timer.Model
 	preparation preparation.Model
 	planning    planning.Model
 }
 
 func New(q *db.Queries) model {
 	return model{
-		q: q,
-		progress: progress.New(
-			progress.WithoutPercentage(),
-			progress.WithWidth(80),
-		),
+		q:           q,
+		timer:       timer.New(),
 		preparation: preparation.New(q),
 		planning:    planning.New(q),
 	}
@@ -64,14 +60,12 @@ func (m model) Init() tea.Cmd {
 	return tea.Batch(
 		m.fetchCurrentSession,
 		m.preparation.Init(),
-		m.progress.Init(),
+		m.timer.Init(),
 	)
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.WindowSizeMsg:
-		m.progress.Width = msg.Width - 13
 	case tea.KeyMsg:
 		if msg.Type == tea.KeyCtrlC {
 			return m, tea.Quit
@@ -99,16 +93,16 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.planning = model.(planning.Model)
 	cmds = append(cmds, cmd)
 
+	model, cmd = m.timer.Update(msg)
+	m.timer = model.(timer.Model)
+	cmds = append(cmds, cmd)
+
 	return m, tea.Batch(cmds...)
 }
 
 func (m model) View() string {
-	cyc := cycletimer.New().CurrentCycle()
-
 	str := ""
-	str += m.progress.ViewAs(cyc.PhasePercentComplete())
-	str += " " + cyc.Phase.String()
-	str += " " + cyc.PhaseRemaining.Round(time.Second).String()
+	str += m.timer.View() + "\n"
 	str += `
 
 ┏┳┓┏━╸┏━╸┏━┓╻ ╻┏━┓┏━┓╻┏
@@ -137,5 +131,12 @@ func main() {
 
 	q := db.New(sqldb)
 	m := New(q)
-	tea.NewProgram(m, tea.WithAltScreen()).Run()
+	p := tea.NewProgram(m, tea.WithAltScreen())
+	go func() {
+		for {
+			p.Send(messages.Tick{})
+			time.Sleep(time.Second)
+		}
+	}()
+	p.Run()
 }
