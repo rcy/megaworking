@@ -55,26 +55,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.state = "init"
 		m.session = &db.Session{}
 		// scan session into formData
-		m.formData.numCyclesString = "999"
-		log.Print("formData:", m.formData)
 		m.form = makeForm(m.formData)
 		cmds = append(cmds, m.form.Init())
 
 	case messages.SessionLoaded:
 		m.state = msg.Session.State
 		m.session = msg.Session
-		// // scan session into formData
-		// m.form = makeForm(&m.formData) // editform?
-		// cmds = append(cmds, m.form.Init())
 	default:
-		log.Print("default: ", msg)
+		//log.Print("default: ", msg)
 	}
-
-	// if m.state == "notfound" {
-	// 	model, cmd := m.create.Update(msg)
-	// 	m.create = model.(create.Model)
-	// 	cmds = append(cmds, cmd)
-	// }
 
 	if m.state == "init" {
 		if m.form != nil {
@@ -83,6 +72,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			cmds = append(cmds, cmd)
 			if m.form.State == huh.StateCompleted {
 				cmds = append(cmds, m.prepareSessionCmd)
+				m.state = "processing"
 			}
 		}
 	}
@@ -97,8 +87,9 @@ func (m Model) prepareSessionCmd() tea.Msg {
 	numCycles, _ := strconv.Atoi(m.formData.numCyclesString)
 	log.Printf("prepareSessionCmd %v", m.formData)
 	s, err := m.q.CreateSession(ctx, db.CreateSessionParams{
-		StartAt:   time.Now(), // TODO
-		NumCycles: int64(numCycles),
+		NumCycles:         int64(numCycles),
+		StartAt:           time.Now(), // TODO
+		StartCycleTimerID: 0,
 	})
 	if err != nil {
 		return messages.QueryError{Err: err}
@@ -127,7 +118,7 @@ func (m Model) View() string {
 	case "init":
 		//sessionLength := 40 * time.Minute * time.Duration(m.session.NumCycles)
 		return m.sessionPrepView() + "\n" + m.form.View()
-	case "prepared":
+	case "prepared", "processing":
 		return m.sessionPrepView()
 	default:
 		return "state==" + m.state

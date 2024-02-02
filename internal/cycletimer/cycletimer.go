@@ -11,9 +11,9 @@ type CycleTimer struct {
 	origin        time.Time
 }
 
-type phase uint8
+type Phase uint8
 
-func (p phase) String() string {
+func (p Phase) String() string {
 	if p == Rest {
 		return "Rest"
 	}
@@ -21,13 +21,14 @@ func (p phase) String() string {
 }
 
 const (
-	Rest phase = iota
+	Void Phase = iota
+	Rest
 	Work
 )
 
 type Cycle struct {
 	ID             int64
-	Phase          phase
+	Phase          Phase
 	PhaseDuration  time.Duration
 	PhaseRemaining time.Duration
 }

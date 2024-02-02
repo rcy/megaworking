@@ -11,36 +11,37 @@ import (
 	"github.com/rcy/megaworking/cmd/foo/messages"
 	"github.com/rcy/megaworking/cmd/foo/planning"
 	"github.com/rcy/megaworking/cmd/foo/preparation"
-	"github.com/rcy/megaworking/cmd/foo/timer"
+	"github.com/rcy/megaworking/cmd/foo/timerbar"
+	"github.com/rcy/megaworking/internal/cycletimer"
 	"github.com/rcy/megaworking/internal/db"
 	_ "modernc.org/sqlite"
 )
+
+// initializing
+// preparing
+// cycling.planning
+// cycling.working
+// cycling.reviewing
+// cycling.resting
+// debriefing
 
 type model struct {
 	q           *db.Queries
 	model       tea.Model
 	session     *db.Session
-	timer       timer.Model
+	cycles      []db.Cycle
+	bar         timerbar.Model
 	preparation preparation.Model
 	planning    planning.Model
 }
 
 func New(q *db.Queries) model {
+	//cycletimer := cycletimer.NewCustom(60*time.Second, 60*time.Second, time.Now())
 	return model{
 		q:           q,
-		timer:       timer.New(),
+		bar:         timerbar.New(),
 		preparation: preparation.New(q),
 		planning:    planning.New(q),
-	}
-}
-
-type newModelMsg struct {
-	model tea.Model
-}
-
-func newModelCmd(model tea.Model) func() tea.Msg {
-	return func() tea.Msg {
-		return newModelMsg{model: model}
 	}
 }
 
@@ -53,18 +54,25 @@ func (m model) fetchCurrentSession() tea.Msg {
 		return messages.QueryError{Err: err}
 	}
 
-	return messages.SessionLoaded{Session: &session}
+	cycles, err := m.q.SessionCycles(context.TODO(), session.ID)
+	if err != nil {
+		return messages.QueryError{Err: err}
+	}
+
+	return messages.SessionLoaded{Session: &session, Cycles: cycles}
 }
 
 func (m model) Init() tea.Cmd {
 	return tea.Batch(
 		m.fetchCurrentSession,
 		m.preparation.Init(),
-		m.timer.Init(),
+		m.bar.Init(),
 	)
 }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmds []tea.Cmd
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		if msg.Type == tea.KeyCtrlC {
@@ -76,9 +84,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case messages.SessionLoaded:
 		m.session = msg.Session
+		m.cycles = msg.Cycles
+
+		cycleTimer := cycletimer.NewCustom(time.Minute, time.Minute, msg.Session.StartAt)
+		cmds = append(cmds, func() tea.Msg { return messages.CycleTimerUpdated{CycleTimer: cycleTimer} })
 	}
 
-	var cmds []tea.Cmd
 	var cmd tea.Cmd
 	if m.model != nil {
 		m.model, cmd = m.model.Update(msg)
@@ -93,8 +104,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	m.planning = model.(planning.Model)
 	cmds = append(cmds, cmd)
 
-	model, cmd = m.timer.Update(msg)
-	m.timer = model.(timer.Model)
+	model, cmd = m.bar.Update(msg)
+	m.bar = model.(timerbar.Model)
 	cmds = append(cmds, cmd)
 
 	return m, tea.Batch(cmds...)
@@ -102,7 +113,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m model) View() string {
 	str := ""
-	str += m.timer.View() + "\n"
+	str += m.bar.View() + "\n"
 	str += `
 
 ┏┳┓┏━╸┏━╸┏━┓╻ ╻┏━┓┏━┓╻┏

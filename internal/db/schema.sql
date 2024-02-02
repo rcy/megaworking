@@ -6,6 +6,8 @@ create table sessions(
 
        num_cycles integer not null,
        start_at datetime not null,
+       -- zero for individual cycles, cycles since origin for group cycles
+       start_cycle_timer_id integer not null,
 
        -- prepare
        accomplish text not null default '',
@@ -29,6 +31,10 @@ create table cycles(
        id integer not null primary key,
        created_at datetime not null default current_timestamp,
        session_id integer references sessions(id) not null,
+
+       -- for individual sessions, this starts at zero
+       -- for group sessions, its the number of cycles since the origin time
+       cycle_timer_id integer not null,
 
        -- plan
        accomplish text not null,
