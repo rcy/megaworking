@@ -33,7 +33,7 @@ func (m Model) Init() tea.Cmd {
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.progress.Width = msg.Width - 13
+		m.progress.Width = msg.Width - 15 // "Work 3/6 23m22s"
 
 	case messages.CycleTimerUpdated:
 		m.cycleTimer = &msg.CycleTimer
@@ -74,8 +74,10 @@ func (m Model) View() string {
 	cycleIndex := m.cycleTimer.CurrentCycle().ID - m.cycleTimer.FirstCycle().ID
 
 	str := "\n"
-	str += cyc.Phase.String() + fmt.Sprintf(" %d/%d %d ", cycleIndex+1, m.cycleTimer.NumCycles(), cyc.ID)
+	str += cyc.Phase.String() + fmt.Sprintf(" %d/%d %s ",
+		cycleIndex+1,
+		m.cycleTimer.NumCycles(),
+		cyc.PhaseRemaining.Round(time.Second).String())
 	str += m.progress.ViewAs(cyc.PhasePercentComplete())
-	str += " " + cyc.PhaseRemaining.Round(time.Second).String()
 	return str
 }
