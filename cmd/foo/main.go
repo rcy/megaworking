@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"os"
 	"time"
 
@@ -27,7 +28,6 @@ import (
 
 type model struct {
 	q           *db.Queries
-	model       tea.Model
 	session     *db.Session
 	cycles      []db.Cycle
 	bar         timerbar.Model
@@ -86,14 +86,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.session = msg.Session
 		m.cycles = msg.Cycles
 
-		cycleTimer := cycletimer.NewCustom(time.Minute, time.Minute, msg.Session.StartAt)
-		cmds = append(cmds, func() tea.Msg { return messages.CycleTimerUpdated{CycleTimer: cycleTimer} })
-	}
+		cycleTimer := cycletimer.NewCustom(
+			10*time.Second,
+			10*time.Second,
+			msg.Session.StartAt,
+			msg.Session.StartAt,
+			msg.Session.NumCycles,
+		)
+		cmds = append(cmds, func() tea.Msg {
+			return messages.CycleTimerUpdated{CycleTimer: cycleTimer}
+		})
 
-	var cmd tea.Cmd
-	if m.model != nil {
-		m.model, cmd = m.model.Update(msg)
-		cmds = append(cmds, cmd)
+	case messages.SessionCompleted:
+		m.session = msg.Session
+		return m, tea.Quit
 	}
 
 	model, cmd := m.preparation.Update(msg)
@@ -113,24 +119,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m model) View() string {
 	str := ""
-	str += m.bar.View() + "\n"
-	str += `
-
-┏┳┓┏━╸┏━╸┏━┓╻ ╻┏━┓┏━┓╻┏
-┃┃┃┣╸ ┃╺┓┣━┫┃╻┃┃ ┃┣┳┛┣┻┓
-╹ ╹┗━╸┗━┛╹ ╹┗┻┛┗━┛╹┗╸╹ ╹
-
-
-`
+	// 	str += `┏┳┓┏━╸┏━╸┏━┓╻ ╻┏━┓┏━┓╻┏
+	// ┃┃┃┣╸ ┃╺┓┣━┫┃╻┃┃ ┃┣┳┛┣┻┓
+	// ╹ ╹┗━╸┗━┛╹ ╹┗┻┛┗━┛╹┗╸╹ ╹
+	// `
+	str += `///MEGAWORK\\\` + "\n"
 	str += m.preparation.View()
-	str += "\n\n"
-
 	str += m.planning.View()
-	str += "\n\n"
+	str += m.bar.View()
 
-	if m.model != nil {
-		str += m.model.View()
-	}
 	return str
 }
 
@@ -155,5 +152,18 @@ func main() {
 			time.Sleep(time.Second)
 		}
 	}()
-	p.Run()
+	fm, err := p.Run()
+	if err != nil {
+		panic(err)
+	}
+	if m, ok := fm.(model); ok {
+		if m.session != nil {
+			fmt.Println("session.Status==", m.session.Status)
+			switch m.session.Status {
+			case "completed":
+				fmt.Println("next steps:", m.session.Nextsteps)
+			}
+		}
+	}
+
 }

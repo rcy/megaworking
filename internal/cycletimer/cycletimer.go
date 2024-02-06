@@ -1,7 +1,6 @@
 package cycletimer
 
 import (
-	"log"
 	"time"
 )
 
@@ -133,7 +132,7 @@ func (cs CycleTimer) CycleAt(when time.Time) Cycle {
 	cycleNumber := cycle.ID - startingID + 1
 
 	cycle.Number = cycleNumber
-	log.Printf("cycleNumber %d\n", cycleNumber)
+	//log.Printf("cycleNumber %d\n", cycleNumber)
 
 	if cycleNumber > cs.numCycles {
 		cycle.Phase = Done

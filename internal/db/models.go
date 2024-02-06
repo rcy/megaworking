@@ -18,12 +18,16 @@ type Cycle struct {
 	Hazards      string
 	Energy       int64
 	Morale       int64
+	Target       int64
+	Noteworthy   string
+	Distractions string
+	Improve      string
 }
 
 type Session struct {
 	ID                int64
 	CreatedAt         time.Time
-	State             string
+	Status            string
 	NumCycles         int64
 	StartAt           time.Time
 	StartCycleTimerID int64
@@ -33,4 +37,11 @@ type Session struct {
 	Distractions      string
 	Measurable        string
 	Noteworthy        string
+	Target            int64
+	Done              string
+	Compare           string
+	Bogged            string
+	Replicate         string
+	Takeaways         string
+	Nextsteps         string
 }

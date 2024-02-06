@@ -3,6 +3,7 @@ package preparation
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"strconv"
 	"strings"
@@ -16,13 +17,25 @@ import (
 	"github.com/rcy/megaworking/internal/db"
 )
 
+type state int
+
+const (
+	start state = iota
+	loading
+	processingPrep
+	prepared
+	processingDebrief
+	debrief
+	completed
+)
+
 type Model struct {
 	q        *db.Queries
 	form     *huh.Form
 	formData *formData
 	session  *db.Session
 	create   create.Model
-	state    string
+	state    state
 }
 
 type formData struct {
@@ -34,7 +47,7 @@ type formData struct {
 func New(q *db.Queries) Model {
 	return Model{
 		q:        q,
-		state:    "loading",
+		state:    loading,
 		create:   create.New(q),
 		formData: &formData{},
 	}
@@ -47,32 +60,48 @@ func (m Model) Init() tea.Cmd {
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 
-	log.Printf("Update %v", m.formData)
+	//log.Printf("Update %v", m.formData)
 
 	switch msg := msg.(type) {
 	case messages.SessionNotFound:
 		log.Print("SessionNotFound")
-		m.state = "init"
+		m.state = start
 		m.session = &db.Session{}
-		// scan session into formData
-		m.form = makeForm(m.formData)
+		m.form = makePrepareForm(m.formData)
 		cmds = append(cmds, m.form.Init())
 
 	case messages.SessionLoaded:
-		m.state = msg.Session.State
+		switch msg.Session.Status {
+		case "prepared":
+			m.state = prepared
+		}
 		m.session = msg.Session
+
+	case messages.FinalCycleReviewCompleted:
+		m.state = debrief
+		m.form = makeDebriefForm(m.formData)
+		cmds = append(cmds, m.form.Init())
+
 	default:
 		//log.Print("default: ", msg)
 	}
 
-	if m.state == "init" {
-		if m.form != nil {
-			model, cmd := m.form.Update(msg)
-			m.form = model.(*huh.Form)
-			cmds = append(cmds, cmd)
+	if m.form != nil {
+		model, cmd := m.form.Update(msg)
+		m.form = model.(*huh.Form)
+		cmds = append(cmds, cmd)
+
+		switch m.state {
+		case start:
 			if m.form.State == huh.StateCompleted {
-				cmds = append(cmds, m.prepareSessionCmd)
-				m.state = "processing"
+				m.state = processingPrep
+				cmds = append(cmds, withContext(context.TODO(), m.savePrepCmd))
+			}
+
+		case debrief:
+			if m.form.State == huh.StateCompleted {
+				m.state = processingDebrief
+				cmds = append(cmds, withContext(context.TODO(), m.saveDebriefCmd))
 			}
 		}
 	}
@@ -80,9 +109,14 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 }
 
-func (m Model) prepareSessionCmd() tea.Msg {
-	log.Print("prepareSessionCmd")
-	ctx := context.Background()
+func withContext(ctx context.Context, fn func(context.Context) tea.Msg) func() tea.Msg {
+	return func() tea.Msg {
+		return fn(ctx)
+	}
+}
+
+func (m Model) savePrepCmd(ctx context.Context) tea.Msg {
+	log.Print("savePrepCmd")
 
 	numCycles, _ := strconv.Atoi(m.formData.numCyclesString)
 	log.Printf("prepareSessionCmd %v", m.formData)
@@ -111,17 +145,37 @@ func (m Model) prepareSessionCmd() tea.Msg {
 	return messages.SessionLoaded{Session: &s}
 }
 
+func (m Model) saveDebriefCmd(ctx context.Context) tea.Msg {
+	log.Print("saveDebriefCmd")
+	s, err := m.q.DebriefSession(ctx, db.DebriefSessionParams{
+		ID:        m.session.ID,
+		Target:    m.formData.Target,
+		Done:      m.formData.Done,
+		Compare:   m.formData.Compare,
+		Bogged:    m.formData.Bogged,
+		Replicate: m.formData.Replicate,
+		Takeaways: m.formData.Takeaways,
+		Nextsteps: m.formData.Nextsteps,
+	})
+	if err != nil {
+		return messages.QueryError{Err: err}
+	}
+
+	return messages.SessionCompleted{Session: &s}
+}
+
 func (m Model) View() string {
 	switch m.state {
-	// case "notfound":
-	// 	return m.create.View()
-	case "init":
-		//sessionLength := 40 * time.Minute * time.Duration(m.session.NumCycles)
-		return m.sessionPrepView() + "\n" + m.form.View()
-	case "prepared", "processing":
+	case start:
+		return "Take a few minutes to prepare, so that your next 4 hours are effective.\n\n" +
+			m.form.View()
+	case processingPrep, prepared:
 		return m.sessionPrepView()
+	case debrief:
+		return "Take a few minutes to debrief, so that you can identify and lock-in lessons.\n\n" +
+			m.form.View()
 	default:
-		return "state==" + m.state
+		return fmt.Sprintf("state==%d", m.state)
 	}
 }
 
@@ -132,16 +186,20 @@ func required(str string) error {
 	return nil
 }
 
-func makeForm(data *formData) *huh.Form {
+func makePrepareForm(data *formData) *huh.Form {
 	log.Println("makeForm", data)
+	if data.numCyclesString == "" {
+		data.numCyclesString = "2"
+	}
+
 	return huh.NewForm(
 		huh.NewGroup(
 			huh.NewSelect[string]().
 				Key("startAt").
 				Title("When do you want to start working").
 				Options(
-					huh.NewOption("Join the next group cycle", "group"),
 					huh.NewOption("Start a new cycle right away", "now"),
+					huh.NewOption("Join the next group cycle", "group"),
 				).
 				Value(&data.startAtString),
 			huh.NewInput().
@@ -161,7 +219,7 @@ func makeForm(data *formData) *huh.Form {
 				Title("How will I know when this is complete?").
 				Value(&data.Complete),
 			huh.NewInput().
-				Title("Any risks / hazards? Potential distractions, procrastination, etc.").
+				Title("Potential distractions, procrastination? How am I going to deal with them?").
 				Value(&data.Distractions),
 			huh.NewInput().
 				Title("Is this concrete / measurable or subjective / ambiguous?").
@@ -169,6 +227,41 @@ func makeForm(data *formData) *huh.Form {
 			huh.NewInput().
 				Title("Anything else noteworthy?").
 				Value(&data.Noteworthy),
+		),
+	).WithHeight(20)
+}
+
+func makeDebriefForm(data *formData) *huh.Form {
+	return huh.NewForm(
+		huh.NewGroup(
+			huh.NewSelect[int64]().
+				Title("Did you complete your session's targets?").
+				Options(
+					huh.NewOption("Yes", int64(100)),
+					huh.NewOption("Half", int64(50)),
+					huh.NewOption("No", int64(0)),
+				).
+				Value(&data.Target),
+			huh.NewText().
+				Title("What did I get done this session?").
+				Value(&data.Done),
+			huh.NewText().
+				Title("What are the next steps?").
+				Value(&data.Nextsteps),
+		),
+		huh.NewGroup(
+			huh.NewInput().
+				Title("How did this compare to my normal work output?").
+				Value(&data.Compare),
+			huh.NewInput().
+				Title("Did I get bogged down? Where?").
+				Value(&data.Bogged),
+			huh.NewInput().
+				Title("What went well? How can I replicate this in the future?").
+				Value(&data.Replicate),
+			huh.NewInput().
+				Title("Any other takeaways? Lessons to share with others?").
+				Value(&data.Takeaways),
 		),
 	)
 }
@@ -198,6 +291,5 @@ func (m Model) sessionPrepView() string {
 	}
 
 	str := strings.Join(strs, "\n")
-	str += "\n\n"
 	return lipgloss.NewStyle().SetString(str).Render()
 }

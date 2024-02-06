@@ -2,7 +2,11 @@
 select * from sessions order by created_at desc;
 
 -- name: CurrentSession :one
-select * from sessions order by created_at desc limit 1;
+select *
+from sessions
+where status != 'completed'
+order by created_at desc
+limit 1;
 
 -- name: PrepareSession :one
 update sessions
@@ -12,7 +16,20 @@ set accomplish = ?,
     distractions = ?,
     measurable = ?,
     noteworthy = ?,
-    state = 'prepared'
+    status = 'prepared'
+where id = ?
+returning *;
+
+-- name: DebriefSession :one
+update sessions
+set target = ?,
+    done = ?,
+    compare = ?,
+    bogged = ?,
+    replicate = ?,
+    takeaways = ?,
+    nextsteps = ?,
+    status = 'completed'
 where id = ?
 returning *;
 
@@ -25,6 +42,15 @@ insert into sessions(
 
 -- name: CreateCycle :one
 insert into cycles(session_id, cycle_timer_id, accomplish, started, hazards, energy, morale) values(?,?,?,?,?,?,?) returning *;
+
+-- name: UpdateCycle :one
+update cycles
+set target = ?,
+    noteworthy = ?,
+    distractions = ?,
+    improve = ?
+where id = ?
+returning *;
 
 -- name: SessionCycles :many
 select * from cycles where session_id = ? order by cycle_timer_id;

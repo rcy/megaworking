@@ -11,7 +11,7 @@ import (
 )
 
 const createCycle = `-- name: CreateCycle :one
-insert into cycles(session_id, cycle_timer_id, accomplish, started, hazards, energy, morale) values(?,?,?,?,?,?,?) returning id, created_at, session_id, cycle_timer_id, accomplish, started, hazards, energy, morale
+insert into cycles(session_id, cycle_timer_id, accomplish, started, hazards, energy, morale) values(?,?,?,?,?,?,?) returning id, created_at, session_id, cycle_timer_id, accomplish, started, hazards, energy, morale, target, noteworthy, distractions, improve
 `
 
 type CreateCycleParams struct {
@@ -45,6 +45,10 @@ func (q *Queries) CreateCycle(ctx context.Context, arg CreateCycleParams) (Cycle
 		&i.Hazards,
 		&i.Energy,
 		&i.Morale,
+		&i.Target,
+		&i.Noteworthy,
+		&i.Distractions,
+		&i.Improve,
 	)
 	return i, err
 }
@@ -54,7 +58,7 @@ insert into sessions(
        num_cycles,
        start_at,
        start_cycle_timer_id
-) values(?, ?, ?) returning id, created_at, state, num_cycles, start_at, start_cycle_timer_id, accomplish, important, complete, distractions, measurable, noteworthy
+) values(?, ?, ?) returning id, created_at, status, num_cycles, start_at, start_cycle_timer_id, accomplish, important, complete, distractions, measurable, noteworthy, target, done, compare, bogged, replicate, takeaways, nextsteps
 `
 
 type CreateSessionParams struct {
@@ -69,7 +73,7 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (S
 	err := row.Scan(
 		&i.ID,
 		&i.CreatedAt,
-		&i.State,
+		&i.Status,
 		&i.NumCycles,
 		&i.StartAt,
 		&i.StartCycleTimerID,
@@ -79,12 +83,23 @@ func (q *Queries) CreateSession(ctx context.Context, arg CreateSessionParams) (S
 		&i.Distractions,
 		&i.Measurable,
 		&i.Noteworthy,
+		&i.Target,
+		&i.Done,
+		&i.Compare,
+		&i.Bogged,
+		&i.Replicate,
+		&i.Takeaways,
+		&i.Nextsteps,
 	)
 	return i, err
 }
 
 const currentSession = `-- name: CurrentSession :one
-select id, created_at, state, num_cycles, start_at, start_cycle_timer_id, accomplish, important, complete, distractions, measurable, noteworthy from sessions order by created_at desc limit 1
+select id, created_at, status, num_cycles, start_at, start_cycle_timer_id, accomplish, important, complete, distractions, measurable, noteworthy, target, done, compare, bogged, replicate, takeaways, nextsteps
+from sessions
+where status != 'completed'
+order by created_at desc
+limit 1
 `
 
 func (q *Queries) CurrentSession(ctx context.Context) (Session, error) {
@@ -93,7 +108,7 @@ func (q *Queries) CurrentSession(ctx context.Context) (Session, error) {
 	err := row.Scan(
 		&i.ID,
 		&i.CreatedAt,
-		&i.State,
+		&i.Status,
 		&i.NumCycles,
 		&i.StartAt,
 		&i.StartCycleTimerID,
@@ -103,6 +118,74 @@ func (q *Queries) CurrentSession(ctx context.Context) (Session, error) {
 		&i.Distractions,
 		&i.Measurable,
 		&i.Noteworthy,
+		&i.Target,
+		&i.Done,
+		&i.Compare,
+		&i.Bogged,
+		&i.Replicate,
+		&i.Takeaways,
+		&i.Nextsteps,
+	)
+	return i, err
+}
+
+const debriefSession = `-- name: DebriefSession :one
+update sessions
+set target = ?,
+    done = ?,
+    compare = ?,
+    bogged = ?,
+    replicate = ?,
+    takeaways = ?,
+    nextsteps = ?,
+    status = 'completed'
+where id = ?
+returning id, created_at, status, num_cycles, start_at, start_cycle_timer_id, accomplish, important, complete, distractions, measurable, noteworthy, target, done, compare, bogged, replicate, takeaways, nextsteps
+`
+
+type DebriefSessionParams struct {
+	Target    int64
+	Done      string
+	Compare   string
+	Bogged    string
+	Replicate string
+	Takeaways string
+	Nextsteps string
+	ID        int64
+}
+
+func (q *Queries) DebriefSession(ctx context.Context, arg DebriefSessionParams) (Session, error) {
+	row := q.db.QueryRowContext(ctx, debriefSession,
+		arg.Target,
+		arg.Done,
+		arg.Compare,
+		arg.Bogged,
+		arg.Replicate,
+		arg.Takeaways,
+		arg.Nextsteps,
+		arg.ID,
+	)
+	var i Session
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.Status,
+		&i.NumCycles,
+		&i.StartAt,
+		&i.StartCycleTimerID,
+		&i.Accomplish,
+		&i.Important,
+		&i.Complete,
+		&i.Distractions,
+		&i.Measurable,
+		&i.Noteworthy,
+		&i.Target,
+		&i.Done,
+		&i.Compare,
+		&i.Bogged,
+		&i.Replicate,
+		&i.Takeaways,
+		&i.Nextsteps,
 	)
 	return i, err
 }
@@ -115,9 +198,9 @@ set accomplish = ?,
     distractions = ?,
     measurable = ?,
     noteworthy = ?,
-    state = 'prepared'
+    status = 'prepared'
 where id = ?
-returning id, created_at, state, num_cycles, start_at, start_cycle_timer_id, accomplish, important, complete, distractions, measurable, noteworthy
+returning id, created_at, status, num_cycles, start_at, start_cycle_timer_id, accomplish, important, complete, distractions, measurable, noteworthy, target, done, compare, bogged, replicate, takeaways, nextsteps
 `
 
 type PrepareSessionParams struct {
@@ -144,7 +227,7 @@ func (q *Queries) PrepareSession(ctx context.Context, arg PrepareSessionParams) 
 	err := row.Scan(
 		&i.ID,
 		&i.CreatedAt,
-		&i.State,
+		&i.Status,
 		&i.NumCycles,
 		&i.StartAt,
 		&i.StartCycleTimerID,
@@ -154,12 +237,19 @@ func (q *Queries) PrepareSession(ctx context.Context, arg PrepareSessionParams) 
 		&i.Distractions,
 		&i.Measurable,
 		&i.Noteworthy,
+		&i.Target,
+		&i.Done,
+		&i.Compare,
+		&i.Bogged,
+		&i.Replicate,
+		&i.Takeaways,
+		&i.Nextsteps,
 	)
 	return i, err
 }
 
 const sessionCycleByCycleTimerID = `-- name: SessionCycleByCycleTimerID :one
-select id, created_at, session_id, cycle_timer_id, accomplish, started, hazards, energy, morale from cycles where session_id = ? and cycle_timer_id = ?
+select id, created_at, session_id, cycle_timer_id, accomplish, started, hazards, energy, morale, target, noteworthy, distractions, improve from cycles where session_id = ? and cycle_timer_id = ?
 `
 
 type SessionCycleByCycleTimerIDParams struct {
@@ -180,12 +270,16 @@ func (q *Queries) SessionCycleByCycleTimerID(ctx context.Context, arg SessionCyc
 		&i.Hazards,
 		&i.Energy,
 		&i.Morale,
+		&i.Target,
+		&i.Noteworthy,
+		&i.Distractions,
+		&i.Improve,
 	)
 	return i, err
 }
 
 const sessionCycles = `-- name: SessionCycles :many
-select id, created_at, session_id, cycle_timer_id, accomplish, started, hazards, energy, morale from cycles where session_id = ? order by cycle_timer_id
+select id, created_at, session_id, cycle_timer_id, accomplish, started, hazards, energy, morale, target, noteworthy, distractions, improve from cycles where session_id = ? order by cycle_timer_id
 `
 
 func (q *Queries) SessionCycles(ctx context.Context, sessionID int64) ([]Cycle, error) {
@@ -207,6 +301,10 @@ func (q *Queries) SessionCycles(ctx context.Context, sessionID int64) ([]Cycle, 
 			&i.Hazards,
 			&i.Energy,
 			&i.Morale,
+			&i.Target,
+			&i.Noteworthy,
+			&i.Distractions,
+			&i.Improve,
 		); err != nil {
 			return nil, err
 		}
@@ -222,7 +320,7 @@ func (q *Queries) SessionCycles(ctx context.Context, sessionID int64) ([]Cycle, 
 }
 
 const sessions = `-- name: Sessions :many
-select id, created_at, state, num_cycles, start_at, start_cycle_timer_id, accomplish, important, complete, distractions, measurable, noteworthy from sessions order by created_at desc
+select id, created_at, status, num_cycles, start_at, start_cycle_timer_id, accomplish, important, complete, distractions, measurable, noteworthy, target, done, compare, bogged, replicate, takeaways, nextsteps from sessions order by created_at desc
 `
 
 func (q *Queries) Sessions(ctx context.Context) ([]Session, error) {
@@ -237,7 +335,7 @@ func (q *Queries) Sessions(ctx context.Context) ([]Session, error) {
 		if err := rows.Scan(
 			&i.ID,
 			&i.CreatedAt,
-			&i.State,
+			&i.Status,
 			&i.NumCycles,
 			&i.StartAt,
 			&i.StartCycleTimerID,
@@ -247,6 +345,13 @@ func (q *Queries) Sessions(ctx context.Context) ([]Session, error) {
 			&i.Distractions,
 			&i.Measurable,
 			&i.Noteworthy,
+			&i.Target,
+			&i.Done,
+			&i.Compare,
+			&i.Bogged,
+			&i.Replicate,
+			&i.Takeaways,
+			&i.Nextsteps,
 		); err != nil {
 			return nil, err
 		}
@@ -259,4 +364,49 @@ func (q *Queries) Sessions(ctx context.Context) ([]Session, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const updateCycle = `-- name: UpdateCycle :one
+update cycles
+set target = ?,
+    noteworthy = ?,
+    distractions = ?,
+    improve = ?
+where id = ?
+returning id, created_at, session_id, cycle_timer_id, accomplish, started, hazards, energy, morale, target, noteworthy, distractions, improve
+`
+
+type UpdateCycleParams struct {
+	Target       int64
+	Noteworthy   string
+	Distractions string
+	Improve      string
+	ID           int64
+}
+
+func (q *Queries) UpdateCycle(ctx context.Context, arg UpdateCycleParams) (Cycle, error) {
+	row := q.db.QueryRowContext(ctx, updateCycle,
+		arg.Target,
+		arg.Noteworthy,
+		arg.Distractions,
+		arg.Improve,
+		arg.ID,
+	)
+	var i Cycle
+	err := row.Scan(
+		&i.ID,
+		&i.CreatedAt,
+		&i.SessionID,
+		&i.CycleTimerID,
+		&i.Accomplish,
+		&i.Started,
+		&i.Hazards,
+		&i.Energy,
+		&i.Morale,
+		&i.Target,
+		&i.Noteworthy,
+		&i.Distractions,
+		&i.Improve,
+	)
+	return i, err
 }

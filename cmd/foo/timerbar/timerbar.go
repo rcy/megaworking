@@ -41,29 +41,41 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	var cmds []tea.Cmd
 	if m.cycleTimer != nil {
-		if m.cycleTimer.CurrentCycle().Phase != m.phase {
-			cmds = append(cmds, phaseChangedCmd)
+		phase := m.cycleTimer.CurrentCycle().Phase
+		if phase != m.phase {
+			cmds = append(cmds, phaseChangedCmd(m.phase, phase))
+			m.phase = phase
 		}
-		m.phase = m.cycleTimer.CurrentCycle().Phase
 	}
 
 	return m, tea.Batch(cmds...)
 }
 
-func phaseChangedCmd() tea.Msg {
-	return messages.PhaseChanged{}
+func phaseChangedCmd(old, new cycletimer.Phase) func() tea.Msg {
+	return func() tea.Msg {
+		return messages.PhaseChanged{
+			OldPhase: old,
+			NewPhase: new,
+		}
+	}
 }
 
 func (m Model) View() string {
 	if m.cycleTimer == nil {
-		return "no timer yet"
+		return "\n"
 	}
+
+	if m.phase == cycletimer.Done {
+		return "\n"
+	}
+
 	cyc := m.cycleTimer.CurrentCycle()
 
-	str := ""
-	str += fmt.Sprint(cyc.ID) + "\n"
+	cycleIndex := m.cycleTimer.CurrentCycle().ID - m.cycleTimer.FirstCycle().ID
+
+	str := "\n"
+	str += cyc.Phase.String() + fmt.Sprintf(" %d/%d %d ", cycleIndex+1, m.cycleTimer.NumCycles(), cyc.ID)
 	str += m.progress.ViewAs(cyc.PhasePercentComplete())
-	str += " " + cyc.Phase.String()
 	str += " " + cyc.PhaseRemaining.Round(time.Second).String()
 	return str
 }

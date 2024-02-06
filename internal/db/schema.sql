@@ -2,11 +2,11 @@ create table sessions(
        id integer not null primary key,
        created_at datetime not null default current_timestamp,
 
-       state text not null default 'init',
+       status text not null default 'init',
 
        num_cycles integer not null,
        start_at datetime not null,
-       -- zero for individual cycles, cycles since origin for group cycles
+       -- zero for individual cycles, or cycles since origin for group cycles
        start_cycle_timer_id integer not null,
 
        -- prepare
@@ -15,16 +15,16 @@ create table sessions(
        complete text not null default '',
        distractions text not null default '',
        measurable text not null default '',
-       noteworthy text not null default ''
+       noteworthy text not null default '',
 
        -- debrief
-       -- target integer not null,
-       -- done text not null,
-       -- compare text not null,
-       -- bogged text not null,
-       -- replicate text not null,
-       -- takeaways text not null,
-       -- nextsteps text not null,
+       target integer not null default 0,
+       done text not null default '',
+       compare text not null default '',
+       bogged text not null default '',
+       replicate text not null default '',
+       takeaways text not null default '',
+       nextsteps text not null default ''
 );
 
 create table cycles(
@@ -37,15 +37,15 @@ create table cycles(
        cycle_timer_id integer not null,
 
        -- plan
-       accomplish text not null,
-       started text not null,
-       hazards text not null,
-       energy integer not null,
-       morale integer not null
+       accomplish text not null default '',
+       started text not null default '',
+       hazards text not null default '',
+       energy integer not null default '',
+       morale integer not null default '',
 
        -- review
-       -- target integer not null,
-       -- noteworthy text not null,
-       -- distractions text not null,
-       -- improve text not null
+       target integer not null default 0,
+       noteworthy text not null default '',
+       distractions text not null default '',
+       improve text not null default ''
 );

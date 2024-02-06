@@ -13,6 +13,10 @@ type SessionLoaded struct {
 	Cycles  []db.Cycle
 }
 
+type SessionCompleted struct {
+	Session *db.Session
+}
+
 type SessionNotFound struct{}
 
 type Tick struct{}
@@ -21,4 +25,9 @@ type CycleTimerUpdated struct {
 	CycleTimer cycletimer.CycleTimer
 }
 
-type PhaseChanged struct{}
+type PhaseChanged struct {
+	OldPhase cycletimer.Phase
+	NewPhase cycletimer.Phase
+}
+
+type FinalCycleReviewCompleted struct{}

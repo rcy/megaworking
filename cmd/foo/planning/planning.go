@@ -19,20 +19,33 @@ type Model struct {
 	cycles       []db.Cycle
 	currentCycle *db.Cycle
 	cycleTimer   *cycletimer.CycleTimer
-	state        string
-	formData     *formData
+	formState    formState
+	planData     *planData
+	reviewData   *reviewData
 	form         *huh.Form
+	//phase      cycletimer.Phase
 }
 
-type formData struct {
+type formState int
+
+const (
+	none formState = iota
+	plan
+	review
+)
+
+type planData struct {
+	db.Cycle
+}
+
+type reviewData struct {
 	db.Cycle
 }
 
 func New(q *db.Queries) Model {
 	return Model{
-		q:     q,
-		state: "init",
-		//formData: &formData{},
+		q:         q,
+		formState: none,
 	}
 }
 
@@ -42,7 +55,7 @@ func (m Model) Init() tea.Cmd {
 
 type currentCycleNotFound struct{}
 
-type currentCycleLoaded struct {
+type cycleLoaded struct {
 	cycle *db.Cycle
 }
 
@@ -62,7 +75,7 @@ func (m Model) fetchCurrentCycle() tea.Msg {
 	if err != nil {
 		return messages.QueryError{Err: err}
 	}
-	return currentCycleLoaded{cycle: &cycle}
+	return cycleLoaded{cycle: &cycle}
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -76,18 +89,35 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.cycleTimer = &msg.CycleTimer
 		cmds = append(cmds, m.fetchCurrentCycle)
 	case currentCycleNotFound:
-		m.formData = &formData{}
-		m.form = makePlanForm(m.formData)
-		cmds = append(cmds, m.form.Init())
-		m.state = "plan"
-	case currentCycleLoaded:
+		if m.cycleTimer.CurrentCycle().Phase != cycletimer.Done {
+			m.formState = plan
+			m.planData = &planData{}
+			m.form = makePlanForm(m.planData)
+			cmds = append(cmds, m.form.Init())
+		} else {
+			cmds = append(cmds, m.finalCycleReviewCompleted)
+		}
+	case cycleLoaded:
 		m.currentCycle = msg.cycle
-	case messages.PhaseChanged:
-		switch m.cycleTimer.CurrentCycle().Phase {
-		case cycletimer.Rest:
-			// do review of previous cycle
+		if m.formState == review {
+			// after reviewing the last cycle, plan the current cycle
 			cmds = append(cmds, m.fetchCurrentCycle)
-		case cycletimer.Work:
+		}
+	case messages.PhaseChanged:
+		log.Printf("planning: PhaseChanged: old=%s new=%s", msg.OldPhase, msg.NewPhase)
+		if msg.OldPhase == cycletimer.Work {
+			// we are coming out of a work phase, we need to review
+			m.formState = review
+			m.reviewData = &reviewData{}
+			m.form = makeReviewForm(m.reviewData)
+			cmds = append(cmds, m.form.Init())
+		} else if msg.OldPhase == cycletimer.Void {
+			// we are entering the first cycle
+			cmds = append(cmds, m.fetchCurrentCycle)
+			// m.formState = plan
+			// m.planData = &planData{}
+			// m.form = makePlanForm(m.planData)
+			// cmds = append(cmds, m.form.Init())
 		}
 	}
 
@@ -96,15 +126,37 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.form = model.(*huh.Form)
 		cmds = append(cmds, cmd)
 
-		log.Printf("m.form: %+v", m.form)
-
 		if m.form.State == huh.StateCompleted {
-			cmds = append(cmds, m.savePlanCmd)
 			m.form = nil
+			if m.formState == plan {
+				cmds = append(cmds, m.savePlanCmd)
+				m.formState = none
+			}
+			if m.formState == review {
+				cmds = append(cmds, m.saveReviewCmd)
+				// if m.cycleTimer.CurrentCycle().Number <= m.cycleTimer.NumCycles() {
+				// 	m.state = plan
+				// 	m.planData = &planData{}
+				// 	m.form = makePlanForm(m.planData)
+				// 	cmds = append(cmds, m.form.Init())
+				// } else {
+				// 	m.state = idle
+				// }
+			}
 		}
 	}
 
 	return m, tea.Batch(cmds...)
+}
+
+func (m Model) finalCycleReviewCompleted() tea.Msg {
+	return messages.FinalCycleReviewCompleted{}
+}
+
+type planMsg struct{}
+
+func (m Model) planCmd() tea.Msg {
+	return planMsg{}
 }
 
 func (m Model) savePlanCmd() tea.Msg {
@@ -112,45 +164,50 @@ func (m Model) savePlanCmd() tea.Msg {
 	cycle, err := m.q.CreateCycle(context.Background(), db.CreateCycleParams{
 		SessionID:    m.session.ID,
 		CycleTimerID: m.cycleTimer.CurrentCycle().ID,
-		Accomplish:   m.formData.Accomplish,
-		Started:      m.formData.Started,
-		Hazards:      m.formData.Hazards,
-		Energy:       m.formData.Energy,
-		Morale:       m.formData.Morale,
+		Accomplish:   m.planData.Accomplish,
+		Started:      m.planData.Started,
+		Hazards:      m.planData.Hazards,
+		Energy:       m.planData.Energy,
+		Morale:       m.planData.Morale,
 	})
 	if err != nil {
 		return messages.QueryError{Err: err}
 	}
 
-	return currentCycleLoaded{cycle: &cycle}
+	return cycleLoaded{cycle: &cycle}
+}
+
+func (m Model) saveReviewCmd() tea.Msg {
+	cycle, err := m.q.UpdateCycle(context.Background(), db.UpdateCycleParams{
+		ID:           m.cycleTimer.CurrentCycle().ID,
+		Target:       m.reviewData.Target,
+		Noteworthy:   m.reviewData.Noteworthy,
+		Distractions: m.reviewData.Distractions,
+		Improve:      m.reviewData.Improve,
+	})
+	if err != nil {
+		return messages.QueryError{Err: err}
+	}
+
+	return cycleLoaded{cycle: &cycle}
 }
 
 func (m Model) View() string {
-	if m.cycleTimer == nil {
-		return "no timer yet"
-	}
-	cyc := m.cycleTimer.CurrentCycle()
-
-	log.Print("planning")
-	log.Printf("  state:%s", m.state)
-	log.Printf("  Phase:%s", cyc.Phase)
-	log.Printf("  cyc.ID:%d", cyc.ID)
-	if m.currentCycle != nil {
-		log.Printf("  current:%d", m.currentCycle.CycleTimerID)
+	if m.form != nil {
+		return "\n" + m.form.View()
 	} else {
-		log.Print("  current: -")
+		return "\n" + m.CyclePlanView()
 	}
+}
 
-	if m.state == "plan" {
-		if m.form != nil {
-			return m.form.View()
-		}
+func (m Model) CyclePlanView() string {
+	if m.currentCycle != nil {
+		return m.currentCycle.Accomplish
 	}
-
 	return ""
 }
 
-func makePlanForm(data *formData) *huh.Form {
+func makePlanForm(data *planData) *huh.Form {
 	return huh.NewForm(
 		huh.NewGroup(
 			huh.NewInput().
@@ -162,6 +219,8 @@ func makePlanForm(data *formData) *huh.Form {
 			huh.NewInput().
 				Title("Any hazards present?").
 				Value(&data.Hazards),
+		),
+		huh.NewGroup(
 			huh.NewSelect[int64]().
 				Title("Energy").
 				Options(
@@ -182,7 +241,7 @@ func makePlanForm(data *formData) *huh.Form {
 	)
 }
 
-func makeReviewForm(data *db.Cycle) *huh.Form {
+func makeReviewForm(data *reviewData) *huh.Form {
 	return huh.NewForm(
 		huh.NewGroup(
 			huh.NewSelect[int64]().
@@ -191,12 +250,16 @@ func makeReviewForm(data *db.Cycle) *huh.Form {
 					huh.NewOption("Yes", int64(100)),
 					huh.NewOption("Half", int64(50)),
 					huh.NewOption("No", int64(0)),
-				),
+				).
+				Value(&data.Target),
 			huh.NewInput().
-				Title("Anything noteworthy?"),
+				Title("Anything noteworthy?").
+				Value(&data.Noteworthy),
 			huh.NewInput().
-				Title("Any distractions?"),
+				Title("Any distractions?").
+				Value(&data.Distractions),
 			huh.NewInput().
-				Title("Things to improve for next cycle?"),
+				Title("Things to improve for next cycle?").
+				Value(&data.Improve),
 		))
 }
