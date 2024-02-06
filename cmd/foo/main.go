@@ -86,8 +86,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.cycles = msg.Cycles
 
 		cycleTimer := cycletimer.NewCustom(
-			10*time.Second,
-			10*time.Second,
+			30*time.Minute,
+			10*time.Minute,
 			msg.Session.StartAt,
 			msg.Session.StartAt,
 			msg.Session.NumCycles,
