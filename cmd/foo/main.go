@@ -118,10 +118,9 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m model) View() string {
 	str := ""
-	str += `///MEGAWORK\\\` + "\n"
+	str += `MEGA ` + m.bar.View()
 	str += m.preparation.View()
 	str += m.planning.View()
-	str += m.bar.View()
 	return str
 }
 
