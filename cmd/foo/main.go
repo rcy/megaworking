@@ -36,7 +36,6 @@ type model struct {
 }
 
 func New(q *db.Queries) model {
-	//cycletimer := cycletimer.NewCustom(60*time.Second, 60*time.Second, time.Now())
 	return model{
 		q:           q,
 		bar:         timerbar.New(),
@@ -119,15 +118,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m model) View() string {
 	str := ""
-	// 	str += `┏┳┓┏━╸┏━╸┏━┓╻ ╻┏━┓┏━┓╻┏
-	// ┃┃┃┣╸ ┃╺┓┣━┫┃╻┃┃ ┃┣┳┛┣┻┓
-	// ╹ ╹┗━╸┗━┛╹ ╹┗┻┛┗━┛╹┗╸╹ ╹
-	// `
 	str += `///MEGAWORK\\\` + "\n"
 	str += m.preparation.View()
 	str += m.planning.View()
 	str += m.bar.View()
-
 	return str
 }
 
@@ -143,20 +137,19 @@ func main() {
 		panic(err)
 	}
 
-	q := db.New(sqldb)
-	m := New(q)
-	p := tea.NewProgram(m, tea.WithAltScreen())
+	queries := db.New(sqldb)
+	program := tea.NewProgram(New(queries), tea.WithAltScreen())
 	go func() {
 		for {
-			p.Send(messages.Tick{})
+			program.Send(messages.Tick{})
 			time.Sleep(time.Second)
 		}
 	}()
-	fm, err := p.Run()
+	finalModel, err := program.Run()
 	if err != nil {
 		panic(err)
 	}
-	if m, ok := fm.(model); ok {
+	if m, ok := finalModel.(model); ok {
 		if m.session != nil {
 			fmt.Println("session.Status==", m.session.Status)
 			switch m.session.Status {
