@@ -96,6 +96,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return messages.CycleTimerUpdated{CycleTimer: cycleTimer}
 		})
 
+	case messages.PhaseChanged:
+		if msg.OldPhase == cycletimer.Work {
+			cmds = append(cmds, beep(3))
+		} else {
+			cmds = append(cmds, beep(1))
+		}
+
 	case messages.SessionCompleted:
 		m.session = msg.Session
 		return m, tea.Quit
@@ -158,4 +165,17 @@ func main() {
 		}
 	}
 
+}
+
+func beep(count int) tea.Cmd {
+	return func() tea.Msg {
+		bell := "\007"
+		for i := count; i > 0; i-- {
+			fmt.Fprint(os.Stdout, bell)
+			if i > 1 {
+				time.Sleep(200 * time.Millisecond)
+			}
+		}
+		return nil
+	}
 }
